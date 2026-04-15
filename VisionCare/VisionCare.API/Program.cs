@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
+using Microsoft.OpenApi.Models;
 using VisionCare.DataAccessLayer;
 using VisionCare.BusinessLogicLayer;
 
@@ -12,52 +12,38 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- ĐĂNG KÝ SERVICES ---
 builder.Services.AddControllers();
-builder.Services.AddOpenApi(options =>
+builder.Services.AddSwaggerGen(options =>
 {
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    options.SwaggerDoc("v1", new OpenApiInfo
     {
-        document.Info.Title = "VisionCare API";
-        document.Info.Version = "v1";
+        Title = "VisionCare API",
+        Version = "v1"
+    });
 
-        // 1. Khởi tạo an toàn (Phòng tránh lỗi NullReference)
-        try 
+    // Thêm Bearer Token authentication
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Nhập Token (vd: Bearer {token})"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
-            document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
-            if (document.Components.SecuritySchemes == null)
+            new OpenApiSecurityScheme
             {
-                // Khởi tạo Dictionary dùng đúng Giao diện (IOpenApiSecurityScheme)
-                document.Components.SecuritySchemes = new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
-            }
-
-            // 2. Định nghĩa Scheme
-            var scheme = new Microsoft.OpenApi.OpenApiSecurityScheme
-            {
-                Type = Microsoft.OpenApi.SecuritySchemeType.Http,
-                Name = "Authorization",
-                In = Microsoft.OpenApi.ParameterLocation.Header,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                Description = "Nhập Token (vd: Bearer {token})"
-            };
-
-            document.Components.SecuritySchemes["Bearer"] = scheme;
-
-            // 3. Tạo Requirement
-            var requirement = new Microsoft.OpenApi.OpenApiSecurityRequirement();
-            var schemeRef = new Microsoft.OpenApi.OpenApiSecuritySchemeReference("Bearer", document);
-            
-            requirement.Add(schemeRef, new List<string>());
-
-            document.Security ??= new List<Microsoft.OpenApi.OpenApiSecurityRequirement>();
-            document.Security.Add(requirement);
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new List<string>()
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[OpenAPI Error] {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
-        }
-
-        return Task.CompletedTask;
     });
 });
 
@@ -94,13 +80,10 @@ var app = builder.Build();
 // --- CẤU HÌNH PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-    
-    // Sử dụng Swagger UI trỏ vào file JSON của OpenApi
+    app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/openapi/v1.json", "VisionCare API v1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "VisionCare API v1");
     });
 }
 
