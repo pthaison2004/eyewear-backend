@@ -29,6 +29,10 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<Promotion> Promotions { get; set; }
 
+    public virtual DbSet<Cart> Carts { get; set; }
+
+    public virtual DbSet<CartItem> CartItems { get; set; }
+
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -199,6 +203,41 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.Users)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK__Users__RoleId__276EDEB3");
+        });
+
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.HasKey(e => e.CartId).HasName("PK__Carts__4154589F1A3E39C5");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.Customer).WithMany(p => p.Carts)
+                .HasForeignKey(d => d.CustomerId)
+                .HasConstraintName("FK__Carts__Customer__5CDB2197");
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.HasKey(e => e.CartItemId).HasName("PK__CartItem__4F27B0B5A7BE0F7E");
+
+            entity.Property(e => e.Quantity).HasDefaultValue(1);
+
+            entity.HasOne(d => d.Cart).WithMany(p => p.CartItems)
+                .HasForeignKey(d => d.CartId)
+                .HasConstraintName("FK__CartItems__Cart__5E8BC0B9");
+
+            entity.HasOne(d => d.Variant).WithMany(p => p.CartItems)
+                .HasForeignKey(d => d.VariantId)
+                .HasConstraintName("FK__CartItems__Varian__5F7E9F5F");
+
+            entity.HasOne(d => d.Prescription).WithMany(p => p.CartItems)
+                .HasForeignKey(d => d.PrescriptionId)
+                .HasConstraintName("FK__CartItems__Prescr__60722E0F");
         });
 
         OnModelCreatingPartial(modelBuilder);
