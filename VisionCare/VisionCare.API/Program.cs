@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using VisionCare.DataAccessLayer;
 using VisionCare.BusinessLogicLayer;
@@ -12,52 +14,52 @@ var builder = WebApplication.CreateBuilder(args);
 
 // --- ĐĂNG KÝ SERVICES ---
 builder.Services.AddControllers();
-builder.Services.AddOpenApi(options =>
+
+// Cấu hình CORS (Cho phép gọi API từ mọi nguồn - Quan trọng khi dùng Ngrok)
+builder.Services.AddCors(options =>
 {
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        document.Info.Title = "VisionCare API";
-        document.Info.Version = "v1";
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
-        // 1. Khởi tạo an toàn (Phòng tránh lỗi NullReference)
-        try 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "VisionCare API",
+        Version = "v1",
+        Description = "API cho hệ thống VisionCare (Cửa hàng mắt kính)"
+    });
+
+    // Cấu hình bảo mật JWT cho Swagger
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Nhập Token theo định dạng: {token}"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
         {
-            document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
-            if (document.Components.SecuritySchemes == null)
+            new OpenApiSecurityScheme
             {
-                // Khởi tạo Dictionary dùng đúng Giao diện (IOpenApiSecurityScheme)
-                document.Components.SecuritySchemes = new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
-            }
-
-            // 2. Định nghĩa Scheme
-            var scheme = new Microsoft.OpenApi.OpenApiSecurityScheme
-            {
-                Type = Microsoft.OpenApi.SecuritySchemeType.Http,
-                Name = "Authorization",
-                In = Microsoft.OpenApi.ParameterLocation.Header,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                Description = "Nhập Token (vd: Bearer {token})"
-            };
-
-            document.Components.SecuritySchemes["Bearer"] = scheme;
-
-            // 3. Tạo Requirement
-            var requirement = new Microsoft.OpenApi.OpenApiSecurityRequirement();
-            var schemeRef = new Microsoft.OpenApi.OpenApiSecuritySchemeReference("Bearer", document);
-            
-            requirement.Add(schemeRef, new List<string>());
-
-            document.Security ??= new List<Microsoft.OpenApi.OpenApiSecurityRequirement>();
-            document.Security.Add(requirement);
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[OpenAPI Error] {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
-        }
-
-        return Task.CompletedTask;
     });
 });
 
@@ -91,24 +93,30 @@ builder.Services.AddBusinessLogic();
 
 var app = builder.Build();
 
+// 1. Cấu hình Forwarded Headers (Giúp nhận diện HTTPS từ Ngrok)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 // --- CẤU HÌNH PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
     app.MapScalarApiReference();
     
-    // Sử dụng Swagger UI trỏ vào file JSON của OpenApi
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/openapi/v1.json", "VisionCare API v1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "VisionCare API v1");
     });
 }
 
-app.UseHttpsRedirection();
+// 2. Kích hoạt CORS (Phải đặt trước Authentication và MapControllers)
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+app.Run();
