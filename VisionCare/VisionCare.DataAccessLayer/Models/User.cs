@@ -31,5 +31,7 @@ public partial class User
 
     public virtual ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
 
+    public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();
+
     public virtual Role? Role { get; set; }
 }

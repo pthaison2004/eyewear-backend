@@ -99,6 +99,9 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
+// 2. Chuyển hướng HTTPS
+app.UseHttpsRedirection();
+
 // --- CẤU HÌNH PIPELINE ---
 if (app.Environment.IsDevelopment())
 {
@@ -111,7 +114,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// 2. Kích hoạt CORS (Phải đặt trước Authentication và MapControllers)
+// 3. Kích hoạt CORS (Phải đặt trước Authentication và MapControllers)
 app.UseCors("AllowAll");
 
 app.UseAuthentication();
