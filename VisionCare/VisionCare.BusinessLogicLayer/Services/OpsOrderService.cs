@@ -16,6 +16,11 @@ public class OpsOrderService : IOpsOrderService
         "Pending", "Confirmed", "Processing"
     };
 
+    private static readonly HashSet<string> TerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cancelled", "Delivered"
+    };
+
     private readonly VisionCareContext _context;
 
     public OpsOrderService(VisionCareContext context)
@@ -45,11 +50,12 @@ public class OpsOrderService : IOpsOrderService
 
         order.PackedAt = DateTime.UtcNow;
         order.PackedBy = staffId;
-        order.OrderStatus = "Packed";
 
-        await _context.SaveChangesAsync();
-
-        return MapToOrderOpsDetailDto(order);
+        return await UpdateOrderStatusAsync(orderId, staffId, new UpdateOrderStatusRequestDto
+        {
+            Status = "Packed",
+            Note = $"Order packed by staff ID {staffId}."
+        });
     }
 
     public async Task<OrderOpsDetailDto> UpdateOrderStatusAsync(int orderId, int staffId, UpdateOrderStatusRequestDto request)
@@ -66,6 +72,13 @@ public class OpsOrderService : IOpsOrderService
             throw new KeyNotFoundException($"Order with ID {orderId} not found.");
         }
 
+        var currentStatus = order.OrderStatus ?? string.Empty;
+        if (TerminalStatuses.Contains(currentStatus))
+        {
+            throw new InvalidOperationException(
+                $"Order cannot have its status changed. Current status '{currentStatus}' is a terminal state.");
+        }
+
         var newStatus = request.Status?.Trim();
         if (string.IsNullOrEmpty(newStatus) || !ValidStatuses.Contains(newStatus))
         {
@@ -73,6 +86,7 @@ public class OpsOrderService : IOpsOrderService
                 $"Invalid status '{request.Status}'. Valid statuses are: {string.Join(", ", ValidStatuses)}.");
         }
 
+        var fromStatus = order.OrderStatus ?? string.Empty;
         order.OrderStatus = newStatus;
 
         if (string.Equals(newStatus, "Packed", StringComparison.OrdinalIgnoreCase))
@@ -90,6 +104,17 @@ public class OpsOrderService : IOpsOrderService
                 : $"{existingNote}\n{noteEntry}";
         }
 
+        var historyEntry = new OrderStatusHistory
+        {
+            OrderId = order.OrderId,
+            FromStatus = fromStatus,
+            ToStatus = newStatus,
+            Note = request.Note,
+            ChangedBy = staffId,
+            ChangedAt = DateTime.UtcNow
+        };
+        _context.OrderStatusHistories.Add(historyEntry);
+
         await _context.SaveChangesAsync();
 
         return MapToOrderOpsDetailDto(order);
@@ -100,7 +125,7 @@ public class OpsOrderService : IOpsOrderService
         return new OrderOpsDetailDto
         {
             OrderId = order.OrderId,
-            OrderCode = $"ORD-{order.OrderId:D4}",
+            OrderCode = $"ORD-{order.OrderId:D6}",
             CustomerName = order.Customer?.FullName ?? string.Empty,
             CustomerEmail = order.Customer?.Email ?? string.Empty,
             OrderType = order.OrderType ?? string.Empty,
