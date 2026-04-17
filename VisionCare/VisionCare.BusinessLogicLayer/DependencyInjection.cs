@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using VisionCare.BusinessLogicLayer.Interfaces;
 using VisionCare.BusinessLogicLayer.Services;
 
 namespace VisionCare.BusinessLogicLayer;
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesPrescriptionService, SalesPrescriptionService>();
         services.AddScoped<ISalesPreOrderService, SalesPreOrderService>();
         services.AddScoped<ISalesComplaintService, SalesComplaintService>();
+        services.AddScoped<IShippingService, ShippingService>();
 
         return services;
     }
