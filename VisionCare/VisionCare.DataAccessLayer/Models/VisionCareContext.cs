@@ -37,6 +37,8 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -238,6 +240,28 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Prescription).WithMany(p => p.CartItems)
                 .HasForeignKey(d => d.PrescriptionId)
                 .HasConstraintName("FK__CartItems__Prescr__60722E0F");
+        });
+
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId).HasName("PK__OrderStat__FD25C5D9E3F5A3B6");
+
+            entity.Property(e => e.FromStatus).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ToStatus).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Note).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ChangedAt)
+                .HasDefaultValueSql("SYSUTCDATETIME()")
+                .HasColumnType("datetime2");
+
+            entity.HasOne(e => e.Order)
+                .WithMany(o => o.OrderStatusHistories)
+                .HasForeignKey(e => e.OrderId)
+                .HasConstraintName("FK__OrderStatus__Order__7C7BAF4E");
+
+            entity.HasOne(e => e.ChangedByUser)
+                .WithMany(u => u.OrderStatusHistories)
+                .HasForeignKey(e => e.ChangedBy)
+                .HasConstraintName("FK__OrderStatus__User__7D6B9B87");
         });
 
         OnModelCreatingPartial(modelBuilder);
