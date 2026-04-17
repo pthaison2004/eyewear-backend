@@ -265,7 +265,11 @@ public partial class VisionCareContext : DbContext
                 .HasForeignKey(e => e.ChangedBy)
                 .HasConstraintName("FK__OrderStatus__User__7D6B9B87");
         });
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 85bf5ea4fa21feaa5fe3eebd6c508caa300ee8ae
         modelBuilder.Entity<PrescriptionValidationRule>(entity =>
         {
             entity.HasKey(e => e.RuleId).HasName("PK__PrescriptValidationRule");
@@ -276,7 +280,10 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.MinValue).HasPrecision(10, 2);
             entity.Property(e => e.MaxValue).HasPrecision(10, 2);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+<<<<<<< HEAD
             entity.Property(e => e.SortOrder).HasDefaultValue(0);
+=======
+>>>>>>> 85bf5ea4fa21feaa5fe3eebd6c508caa300ee8ae
         });
 
         OnModelCreatingPartial(modelBuilder);
