@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using VisionCare.BusinessLogicLayer.Interfaces;
 using VisionCare.BusinessLogicLayer.Services;
 
 namespace VisionCare.BusinessLogicLayer;
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IOpsOrderService, OpsOrderService>();
         services.AddScoped<ISalesPrescriptionService, SalesPrescriptionService>();
+        services.AddScoped<IShippingService, ShippingService>();
 
         // Seed prescription validation rules
         using (var scope = services.BuildServiceProvider().CreateScope())
