@@ -133,4 +133,108 @@ public class OpsOrderService : IOpsOrderService
         if (!string.IsNullOrWhiteSpace(variant.Size)) parts.Add(variant.Size);
         return string.Join(" / ", parts);
     }
+
+    public async Task<PaginatedResultDto<OpsOrderListItemDto>> GetOrdersAsync(OpsOrderListRequestDto request)
+    {
+        return await BuildOrdersQueryAsync(request);
+    }
+
+    public async Task<PaginatedResultDto<OpsOrderListItemDto>> GetReadyMadeOrdersAsync(OpsOrderListRequestDto request)
+    {
+        request.OrderType = "Ready-made";
+        return await BuildOrdersQueryAsync(request);
+    }
+
+    public async Task<PaginatedResultDto<OpsOrderListItemDto>> GetPrescriptionOrdersAsync(OpsOrderListRequestDto request)
+    {
+        request.OrderType = "Prescription";
+        return await BuildOrdersQueryAsync(request);
+    }
+
+    public async Task<PaginatedResultDto<OpsOrderListItemDto>> GetPreOrderOrdersAsync(OpsOrderListRequestDto request)
+    {
+        request.OrderType = "Pre-order";
+        return await BuildOrdersQueryAsync(request);
+    }
+
+    private async Task<PaginatedResultDto<OpsOrderListItemDto>> BuildOrdersQueryAsync(OpsOrderListRequestDto request)
+    {
+        var page = request.Page < 1 ? 1 : request.Page;
+        var pageSize = request.PageSize < 1 ? 20 : (request.PageSize > 100 ? 100 : request.PageSize);
+
+        var query = _context.Orders
+            .Include(o => o.Customer)
+            .Include(o => o.OrderItems)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(request.Status))
+        {
+            query = query.Where(o => o.OrderStatus != null &&
+                o.OrderStatus.ToLower() == request.Status.ToLower());
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.OrderType))
+        {
+            query = query.Where(o => o.OrderType != null &&
+                o.OrderType.ToLower() == request.OrderType.ToLower());
+        }
+
+        if (request.DateFrom.HasValue)
+        {
+            query = query.Where(o => o.OrderDate >= request.DateFrom.Value);
+        }
+
+        if (request.DateTo.HasValue)
+        {
+            query = query.Where(o => o.OrderDate <= request.DateTo.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.ToLower();
+            query = query.Where(o =>
+                (o.Customer != null && o.Customer.FullName != null && o.Customer.FullName.ToLower().Contains(search)) ||
+                (o.Customer != null && o.Customer.Email != null && o.Customer.Email.ToLower().Contains(search)) ||
+                (o.OrderId.ToString() == search));
+        }
+
+        var totalItems = await query.CountAsync();
+
+        var totalPages = totalItems == 0 ? 1 : (int)Math.Ceiling((double)totalItems / pageSize);
+
+        var items = await query
+            .OrderByDescending(o => o.OrderDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(o => new OpsOrderListItemDto
+            {
+                OrderId = o.OrderId,
+                OrderCode = $"ORD-{o.OrderId:D6}",
+                CustomerName = o.Customer != null ? o.Customer.FullName ?? string.Empty : string.Empty,
+                CustomerEmail = o.Customer != null ? o.Customer.Email ?? string.Empty : string.Empty,
+                OrderType = o.OrderType ?? string.Empty,
+                OrderStatus = o.OrderStatus ?? string.Empty,
+                PaymentStatus = o.PaymentStatus ?? string.Empty,
+                TotalAmount = o.TotalAmount,
+                ItemCount = o.OrderItems.Count,
+                CreatedAt = o.OrderDate ?? DateTime.UtcNow
+            })
+            .ToListAsync();
+
+        return new PaginatedResultDto<OpsOrderListItemDto>
+        {
+            Success = true,
+            Data = items,
+            Meta = new PaginationMeta
+            {
+                Page = page,
+                PageSize = pageSize,
+                TotalItems = totalItems,
+                TotalPages = totalPages,
+                HasNextPage = page < totalPages,
+                HasPreviousPage = page > 1
+            },
+            Timestamp = DateTime.UtcNow
+        };
+    }
 }
