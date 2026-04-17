@@ -27,6 +27,21 @@ public partial class Prescription
 
     public DateTime? CreatedAt { get; set; }
 
+    // Sales verification fields
+    public bool IsVerified { get; set; }
+
+    public DateTime? VerifiedAt { get; set; }
+
+    public int? VerifiedBy { get; set; }
+
+    public bool IsRejected { get; set; }
+
+    public DateTime? RejectedAt { get; set; }
+
+    public int? RejectedBy { get; set; }
+
+    public string? RejectionReason { get; set; }
+
     public virtual User? Customer { get; set; }
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
