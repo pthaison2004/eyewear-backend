@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="VisionCare.API/VisionCare.API.csproj" />
+  <Project Path="VisionCare.BusinessLogicLayer/VisionCare.BusinessLogicLayer.csproj" />
+  <Project Path="VisionCare.DataAccessLayer/VisionCare.DataAccessLayer.csproj" />
+</Solution>
