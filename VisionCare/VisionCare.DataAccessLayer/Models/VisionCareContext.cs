@@ -41,6 +41,9 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
 
+    public virtual DbSet<ShippingMethod> ShippingMethods { get; set; }
+    public virtual DbSet<ShippingOrder> ShippingOrders { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -278,6 +281,47 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.MaxValue).HasPrecision(10, 2);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
             entity.Property(e => e.SortOrder).HasDefaultValue(0);
+        });
+
+        modelBuilder.Entity<ShippingMethod>(entity =>
+        {
+            entity.HasKey(e => e.ShippingMethodId);
+            entity.Property(e => e.MethodCode).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.MethodName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.BaseFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.FeePerKg).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.FreeShippingThreshold).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.MaxCodAmount).HasColumnType("decimal(18,2)");
+        });
+
+        modelBuilder.Entity<ShippingOrder>(entity =>
+        {
+            entity.HasKey(e => e.ShippingOrderId);
+            entity.Property(e => e.ShippingOrderCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CarrierTrackingNo).HasMaxLength(100);
+            entity.Property(e => e.CarrierOrderNo).HasMaxLength(100);
+            entity.Property(e => e.RecipientName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.ProvinceCode).HasMaxLength(20);
+            entity.Property(e => e.DistrictCode).HasMaxLength(20);
+            entity.Property(e => e.WardCode).HasMaxLength(20);
+            entity.Property(e => e.StreetAddress).HasMaxLength(500);
+            entity.Property(e => e.ShippingFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CodFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.InsuranceFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalShippingCost).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Order)
+                .WithMany(o => o.ShippingOrders)
+                .HasForeignKey(e => e.OrderId)
+                .HasConstraintName("FK__ShippingOrder__Order");
+
+            entity.HasOne(e => e.ShippingMethod)
+                .WithMany(s => s.ShippingOrders)
+                .HasForeignKey(e => e.ShippingMethodId)
+                .HasConstraintName("FK__ShippingOrder__Method");
         });
 
         OnModelCreatingPartial(modelBuilder);
