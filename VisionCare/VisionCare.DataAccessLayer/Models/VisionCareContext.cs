@@ -35,6 +35,8 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<PrescriptionValidationRule> PrescriptionValidationRules { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -238,6 +240,18 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Prescription).WithMany(p => p.CartItems)
                 .HasForeignKey(d => d.PrescriptionId)
                 .HasConstraintName("FK__CartItems__Prescr__60722E0F");
+        });
+
+        modelBuilder.Entity<PrescriptionValidationRule>(entity =>
+        {
+            entity.HasKey(e => e.RuleId).HasName("PK__PrescriptValidationRule");
+            entity.Property(e => e.RuleName).HasMaxLength(100);
+            entity.Property(e => e.RuleType).HasMaxLength(50);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.MinValue).HasPrecision(10, 2);
+            entity.Property(e => e.MaxValue).HasPrecision(10, 2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
         });
 
         OnModelCreatingPartial(modelBuilder);
