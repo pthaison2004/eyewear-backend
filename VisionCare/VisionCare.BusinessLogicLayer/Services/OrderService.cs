@@ -32,6 +32,10 @@ public class OrderService : IOrderService
 
         foreach (var item in cart.CartItems)
         {
+            if (item.Variant == null)
+            {
+                throw new InvalidOperationException("Cart contains an item with no variant.");
+            }
             if (item.Variant.StockQuantity < item.Quantity)
             {
                 throw new InvalidOperationException($"Not enough stock for {item.Variant.Product.ProductName}");
@@ -148,7 +152,10 @@ public class OrderService : IOrderService
 
         foreach (var item in order.OrderItems)
         {
-            item.Variant.StockQuantity += item.Quantity;
+            if (item.Variant != null)
+            {
+                item.Variant.StockQuantity += item.Quantity;
+            }
         }
 
         order.OrderStatus = "Cancelled";
@@ -173,7 +180,7 @@ public class OrderService : IOrderService
             Items = items.Select(i => new OrderItemDto
             {
                 OrderItemId = i.OrderItemId,
-                VariantId = i.VariantId ?? 0,
+                VariantId = i.VariantId,
                 ProductName = i.Variant?.Product?.ProductName ?? string.Empty,
                 VariantColor = i.Variant?.Color,
                 VariantSize = i.Variant?.Size,

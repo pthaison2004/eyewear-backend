@@ -481,3 +481,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 VisionCare/VisionCare.API/appsettings.json
+docs/handoff/handoff-20260416-0005.md
+docs/complete-api-specification.md
+docs/ops-api-10-commits.md
+docs/database-schema-design-v3.md
