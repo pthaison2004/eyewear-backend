@@ -1,0 +1,15 @@
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\bin\Debug\net8.0\VisionCare.BusinessLogicLayer.deps.json
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\bin\Debug\net8.0\VisionCare.BusinessLogicLayer.dll
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\bin\Debug\net8.0\VisionCare.BusinessLogicLayer.pdb
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\bin\Debug\net8.0\VisionCare.DataAccessLayer.dll
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\bin\Debug\net8.0\VisionCare.DataAccessLayer.pdb
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.csproj.AssemblyReference.cache
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.AssemblyInfoInputs.cache
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.AssemblyInfo.cs
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.csproj.CoreCompileInputs.cache
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCa.B9BFBA72.Up2Date
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.dll
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\refint\VisionCare.BusinessLogicLayer.dll
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\VisionCare.BusinessLogicLayer.pdb
+C:\Users\ASUS\Downloads\visioncare-backend-Son-Dev\visioncare-backend-Son-Dev\VisionCare\VisionCare.BusinessLogicLayer\obj\Debug\net8.0\ref\VisionCare.BusinessLogicLayer.dll
