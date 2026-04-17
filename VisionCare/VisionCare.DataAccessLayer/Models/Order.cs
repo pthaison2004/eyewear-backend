@@ -25,6 +25,10 @@ public partial class Order
 
     public string? StaffNote { get; set; }
 
+    public DateTime? PackedAt { get; set; }
+
+    public int? PackedBy { get; set; }
+
     public virtual User? Customer { get; set; }
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
