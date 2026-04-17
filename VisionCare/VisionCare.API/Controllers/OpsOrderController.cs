@@ -83,6 +83,82 @@ public class OpsOrderController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Lấy danh sách tất cả đơn hàng Ops cần xử lý
+    /// </summary>
+    [HttpGet]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetOrders([FromQuery] OpsOrderListRequestDto request)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetOrdersAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetOrders");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Lọc đơn hàng Ready-made
+    /// </summary>
+    [HttpGet("ready-made")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetReadyMadeOrders([FromQuery] OpsOrderListRequestDto request)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetReadyMadeOrdersAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetReadyMadeOrders");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Lọc đơn hàng Prescription
+    /// </summary>
+    [HttpGet("prescription")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetPrescriptionOrders([FromQuery] OpsOrderListRequestDto request)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetPrescriptionOrdersAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetPrescriptionOrders");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Lọc đơn hàng Pre-order
+    /// </summary>
+    [HttpGet("pre-order")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetPreOrderOrders([FromQuery] OpsOrderListRequestDto request)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetPreOrderOrdersAsync(request);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetPreOrderOrders");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
     private int GetCurrentUserId()
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
