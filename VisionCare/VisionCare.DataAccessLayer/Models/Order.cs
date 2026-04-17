@@ -33,6 +33,7 @@ public partial class Order
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
+    public virtual ICollection<Complaint> Complaints { get; set; } = new List<Complaint>();
     public virtual ICollection<OrderStatusHistory> OrderStatusHistories { get; set; } = new List<OrderStatusHistory>();
 
     public virtual ICollection<ShippingOrder> ShippingOrders { get; set; } = new List<ShippingOrder>();

@@ -39,6 +39,10 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<PreOrderCampaign> PreOrderCampaigns { get; set; }
+    public virtual DbSet<PreOrderCampaignProduct> PreOrderCampaignProducts { get; set; }
+    public virtual DbSet<PreOrderReservation> PreOrderReservations { get; set; }
+    public virtual DbSet<Complaint> Complaints { get; set; }
     public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
 
     public virtual DbSet<ShippingMethod> ShippingMethods { get; set; }
@@ -281,6 +285,58 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.MaxValue).HasPrecision(10, 2);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
             entity.Property(e => e.SortOrder).HasDefaultValue(0);
+        });
+
+        modelBuilder.Entity<PreOrderCampaign>(entity =>
+        {
+            entity.HasKey(e => e.CampaignId);
+            entity.Property(e => e.CampaignCode).HasMaxLength(50);
+            entity.Property(e => e.CampaignName).HasMaxLength(200);
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.DiscountAmount).HasPrecision(18, 2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<PreOrderCampaignProduct>(entity =>
+        {
+            entity.HasKey(e => e.CampaignProductId);
+            entity.Property(e => e.CampaignPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<PreOrderReservation>(entity =>
+        {
+            entity.HasKey(e => e.ReservationId);
+            entity.Property(e => e.ReservationCode).HasMaxLength(50);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Complaint>(entity =>
+        {
+            entity.HasKey(e => e.ComplaintId);
+            entity.Property(e => e.ComplaintType).HasMaxLength(100);
+            entity.Property(e => e.Subject).HasMaxLength(200);
+            entity.Property(e => e.ComplaintStatus).HasMaxLength(50);
+            entity.Property(e => e.Priority).HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Complaints)
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.Customer).WithMany()
+                .HasForeignKey(d => d.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.AssignedToUser).WithMany()
+                .HasForeignKey(d => d.AssignedTo)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.ProcessedByUser).WithMany()
+                .HasForeignKey(d => d.ProcessedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.ResolvedByUser).WithMany()
+                .HasForeignKey(d => d.ResolvedBy)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ShippingMethod>(entity =>
