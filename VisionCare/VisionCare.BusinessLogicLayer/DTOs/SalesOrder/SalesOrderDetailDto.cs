@@ -27,4 +27,9 @@ public class SalesOrderItemDto
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal Subtotal { get; set; }
+
+    public int? PrescriptionId { get; set; }
+    public bool IsPrescriptionVerified { get; set; }
+    public bool IsPrescriptionRejected { get; set; }
+    public bool IsPrescriptionExpired { get; set; }
 }

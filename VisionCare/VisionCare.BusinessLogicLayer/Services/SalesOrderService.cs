@@ -50,11 +50,24 @@ public class SalesOrderService : ISalesOrderService
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.Variant)
             .ThenInclude(v => v!.Product)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Prescription)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
         if (order == null)
         {
             throw new KeyNotFoundException($"Không tìm thấy đơn hàng với ID {orderId}.");
+        }
+
+        foreach (var item in order.OrderItems.Where(i => i.PrescriptionId != null))
+        {
+            if (item.Prescription == null ||
+                item.Prescription.IsVerified == false ||
+                item.Prescription.IsRejected == true)
+            {
+                throw new InvalidOperationException(
+                    "Đơn hàng có sản phẩm kê đơn chưa được xác minh. Vui lòng xác minh đơn kê đơn trước.");
+            }
         }
 
         if (!string.Equals(order.OrderStatus, "Pending", StringComparison.OrdinalIgnoreCase))
@@ -295,7 +308,12 @@ public class SalesOrderService : ISalesOrderService
                 VariantInfo = FormatVariantInfo(i.Variant),
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                Subtotal = i.Quantity * i.UnitPrice
+                Subtotal = i.Quantity * i.UnitPrice,
+                PrescriptionId = i.PrescriptionId,
+                IsPrescriptionVerified = i.Prescription?.IsVerified ?? false,
+                IsPrescriptionRejected = i.Prescription?.IsRejected ?? false,
+                IsPrescriptionExpired = i.Prescription?.CreatedAt.HasValue == true &&
+                    i.Prescription.CreatedAt.Value.AddMonths(24) < DateTime.UtcNow
             }).ToList()
         };
     }
