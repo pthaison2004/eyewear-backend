@@ -22,4 +22,12 @@ public partial class OrderItem
     public virtual Prescription? Prescription { get; set; }
 
     public virtual ProductVariant? Variant { get; set; }
+
+    public virtual User? AssignedLensMaker { get; set; }
+
+    public int? AssignedLensMakerId { get; set; }
+
+    public DateTime? LensCutCompletedAt { get; set; }
+
+    public string? LensCutNote { get; set; }
 }

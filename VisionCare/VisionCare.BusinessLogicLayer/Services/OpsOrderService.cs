@@ -21,6 +21,16 @@ public class OpsOrderService : IOpsOrderService
         "Cancelled", "Delivered"
     };
 
+    private static readonly HashSet<string> LensWorkAllowedStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Confirmed", "Processing"
+    };
+
+    private static readonly HashSet<string> LensWorkTerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Cancelled", "Delivered", "Packed", "Shipped"
+    };
+
     private readonly VisionCareContext _context;
 
     public OpsOrderService(VisionCareContext context)
@@ -144,7 +154,8 @@ public class OpsOrderService : IOpsOrderService
                 ProductName = i.Variant?.Product?.ProductName ?? string.Empty,
                 VariantInfo = FormatVariantInfo(i.Variant),
                 Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice
+                UnitPrice = i.UnitPrice,
+                PrescriptionId = i.PrescriptionId
             }).ToList()
         };
     }
@@ -260,6 +271,163 @@ public class OpsOrderService : IOpsOrderService
                 HasPreviousPage = page > 1
             },
             Timestamp = DateTime.UtcNow
+        };
+    }
+
+    public async Task<LensWorkDetailDto> GetLensWorkAsync(int orderId)
+    {
+        var order = await LoadOrderForLensWorkAsync(orderId);
+
+        if (!string.Equals(order.OrderType, "Prescription", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Lens work is only available for prescription orders. Order type is '{order.OrderType}'.");
+        }
+
+        return MapToLensWorkDetailDto(order);
+    }
+
+    public async Task<LensWorkDetailDto> AssignLensWorkAsync(int orderId, int staffId, AssignLensWorkRequestDto request)
+    {
+        var order = await LoadOrderForLensWorkAsync(orderId);
+
+        if (!string.Equals(order.OrderType, "Prescription", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Lens work is only available for prescription orders. Order type is '{order.OrderType}'.");
+        }
+
+        var currentStatus = order.OrderStatus ?? string.Empty;
+        if (!LensWorkAllowedStatuses.Contains(currentStatus))
+        {
+            throw new InvalidOperationException(
+                $"Order cannot be assigned lens work. Current status is '{currentStatus}'. Only orders with status 'Confirmed' or 'Processing' can have lens work assigned.");
+        }
+
+        var lensMakerExists = await _context.Users.AnyAsync(u => u.UserId == request.AssignedLensMakerId);
+        if (!lensMakerExists)
+        {
+            throw new KeyNotFoundException($"Lens maker with ID {request.AssignedLensMakerId} not found.");
+        }
+
+        var prescriptionItems = order.OrderItems.Where(oi => oi.PrescriptionId.HasValue).ToList();
+        if (prescriptionItems.Count == 0)
+        {
+            throw new InvalidOperationException("No prescription items found in this order.");
+        }
+
+        foreach (var item in prescriptionItems)
+        {
+            item.AssignedLensMakerId = request.AssignedLensMakerId;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return MapToLensWorkDetailDto(order);
+    }
+
+    public async Task<LensWorkDetailDto> CompleteLensWorkAsync(int orderId, int staffId, CompleteLensWorkRequestDto request)
+    {
+        var order = await LoadOrderForLensWorkAsync(orderId);
+
+        if (!string.Equals(order.OrderType, "Prescription", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Lens work is only available for prescription orders. Order type is '{order.OrderType}'.");
+        }
+
+        var currentStatus = order.OrderStatus ?? string.Empty;
+        if (LensWorkTerminalStatuses.Contains(currentStatus))
+        {
+            throw new InvalidOperationException(
+                $"Order cannot complete lens work. Current status is '{currentStatus}'.");
+        }
+
+        var prescriptionItems = order.OrderItems.Where(oi => oi.PrescriptionId.HasValue).ToList();
+        if (prescriptionItems.Count == 0)
+        {
+            throw new InvalidOperationException("No prescription items found in this order.");
+        }
+
+        foreach (var item in prescriptionItems)
+        {
+            item.LensCutCompletedAt = DateTime.UtcNow;
+            item.LensCutNote = request.Note;
+        }
+
+        var allDone = prescriptionItems.All(pi => pi.LensCutCompletedAt.HasValue);
+        if (allDone)
+        {
+            var fromStatus = order.OrderStatus ?? string.Empty;
+            order.OrderStatus = "LensCutComplete";
+
+            var historyEntry = new OrderStatusHistory
+            {
+                OrderId = order.OrderId,
+                FromStatus = fromStatus,
+                ToStatus = "LensCutComplete",
+                Note = $"Lens cut completed by staff ID {staffId}.",
+                ChangedBy = staffId,
+                ChangedAt = DateTime.UtcNow
+            };
+            _context.OrderStatusHistories.Add(historyEntry);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return MapToLensWorkDetailDto(order);
+    }
+
+    private async Task<Order> LoadOrderForLensWorkAsync(int orderId)
+    {
+        var order = await _context.Orders
+            .Include(o => o.Customer)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Variant)
+            .ThenInclude(v => v!.Product)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Prescription)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.AssignedLensMaker)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null)
+        {
+            throw new KeyNotFoundException($"Order with ID {orderId} not found.");
+        }
+
+        return order;
+    }
+
+    private static LensWorkDetailDto MapToLensWorkDetailDto(Order order)
+    {
+        return new LensWorkDetailDto
+        {
+            OrderId = order.OrderId,
+            OrderCode = $"ORD-{order.OrderId:D6}",
+            OrderStatus = order.OrderStatus ?? string.Empty,
+            Items = order.OrderItems.Select(i => new LensWorkItemDto
+            {
+                OrderItemId = i.OrderItemId,
+                VariantId = i.VariantId,
+                ProductName = i.Variant?.Product?.ProductName ?? string.Empty,
+                VariantInfo = FormatVariantInfo(i.Variant),
+                Quantity = i.Quantity,
+                PrescriptionId = i.PrescriptionId,
+                OdSphere = i.Prescription?.OdSphere,
+                OdCylinder = i.Prescription?.OdCylinder,
+                OdAxis = i.Prescription?.OdAxis,
+                OsSphere = i.Prescription?.OsSphere,
+                OsCylinder = i.Prescription?.OsCylinder,
+                OsAxis = i.Prescription?.OsAxis,
+                Pd = i.Prescription?.Pd,
+                LensNote = i.Prescription?.Note,
+                AssignedLensMakerId = i.AssignedLensMakerId,
+                AssignedLensMakerName = i.AssignedLensMaker?.FullName,
+                LensCutCompletedAt = i.LensCutCompletedAt,
+                LensCutNote = i.LensCutNote,
+                IsLensCutComplete = i.LensCutCompletedAt.HasValue
+            }).ToList()
         };
     }
 }

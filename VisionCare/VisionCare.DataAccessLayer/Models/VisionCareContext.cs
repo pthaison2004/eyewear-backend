@@ -100,6 +100,10 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Variant).WithMany(p => p.OrderItems)
                 .HasForeignKey(d => d.VariantId)
                 .HasConstraintName("FK__OrderItem__Varia__412EB0B6");
+
+            entity.HasOne(d => d.AssignedLensMaker).WithMany(p => p.AssignedLensOrders)
+                .HasForeignKey(d => d.AssignedLensMakerId)
+                .HasConstraintName("FK__OrderItem__LensMk__7B5A6A1C");
         });
 
         modelBuilder.Entity<Prescription>(entity =>

@@ -164,4 +164,93 @@ public class OpsOrderController : ControllerBase
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(idStr, out var id) ? id : 0;
     }
+
+    /// <summary>
+    /// Lấy chi tiết lens work của đơn hàng prescription
+    /// </summary>
+    [HttpGet("{id}/lens-work")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetLensWork(int id)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetLensWorkAsync(id);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetLensWork");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Gán nhân viên cắt kính cho đơn hàng prescription
+    /// </summary>
+    [HttpPut("{id}/lens-work/assign")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> AssignLensWork(int id, [FromBody] AssignLensWorkRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _opsOrderService.AssignLensWorkAsync(id, staffId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "AssignLensWork");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Hoàn thành cắt kính cho đơn hàng prescription
+    /// </summary>
+    [HttpPut("{id}/lens-work/complete")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> CompleteLensWork(int id, [FromBody] CompleteLensWorkRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _opsOrderService.CompleteLensWorkAsync(id, staffId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "CompleteLensWork");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
 }
