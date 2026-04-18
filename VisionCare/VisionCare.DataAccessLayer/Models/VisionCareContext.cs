@@ -50,6 +50,10 @@ public partial class VisionCareContext : DbContext
     public virtual DbSet<ShippingStatus> ShippingStatuses { get; set; }
     public virtual DbSet<ShippingStatusHistory> ShippingStatusHistories { get; set; }
 
+    public virtual DbSet<Warehouse> Warehouses { get; set; }
+    public virtual DbSet<Inventory> Inventories { get; set; }
+    public virtual DbSet<StockMovement> StockMovements { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -415,6 +419,68 @@ public partial class VisionCareContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.ToStatusId)
                 .HasConstraintName("FK__ShippingStatusHistory__ToStatus");
+        });
+
+        modelBuilder.Entity<Warehouse>(entity =>
+        {
+            entity.HasKey(e => e.WarehouseId);
+            entity.Property(e => e.WarehouseCode).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.WarehouseName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.WarehouseType).HasMaxLength(20);
+            entity.Property(e => e.ProvinceCode).HasMaxLength(20);
+            entity.Property(e => e.ProvinceName).HasMaxLength(100);
+            entity.Property(e => e.DistrictCode).HasMaxLength(20);
+            entity.Property(e => e.DistrictName).HasMaxLength(100);
+            entity.Property(e => e.WardCode).HasMaxLength(20);
+            entity.Property(e => e.WardName).HasMaxLength(100);
+            entity.Property(e => e.StreetAddress).HasMaxLength(500);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+        });
+
+        modelBuilder.Entity<Inventory>(entity =>
+        {
+            entity.HasKey(e => e.InventoryId);
+            entity.Property(e => e.BatchNumber).HasMaxLength(50);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Variant)
+                .WithMany(v => v.Inventories)
+                .HasForeignKey(e => e.VariantId)
+                .HasConstraintName("FK__Inventory__Variant");
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany(w => w.Inventories)
+                .HasForeignKey(e => e.WarehouseId)
+                .HasConstraintName("FK__Inventory__Warehouse");
+
+            entity.HasIndex(e => new { e.VariantId, e.WarehouseId }).IsUnique();
+        });
+
+        modelBuilder.Entity<StockMovement>(entity =>
+        {
+            entity.HasKey(e => e.MovementId);
+            entity.Property(e => e.MovementType).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.ReferenceType).HasMaxLength(30);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.StaffNote).HasMaxLength(1000);
+            entity.Property(e => e.PerformedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Variant)
+                .WithMany()
+                .HasForeignKey(e => e.VariantId)
+                .HasConstraintName("FK__StockMovement__Variant");
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany()
+                .HasForeignKey(e => e.WarehouseId)
+                .HasConstraintName("FK__StockMovement__Warehouse");
+
+            entity.HasOne(e => e.PerformedByUser)
+                .WithMany(u => u.StockMovements)
+                .HasForeignKey(e => e.PerformedBy)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         OnModelCreatingPartial(modelBuilder);

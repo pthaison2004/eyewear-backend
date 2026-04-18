@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using VisionCare.BusinessLogicLayer.DTOs.OpsOrder;
+using VisionCare.BusinessLogicLayer.DTOs.OpsPreOrder;
 using VisionCare.BusinessLogicLayer.Services;
 
 namespace VisionCare.API.Controllers;
@@ -250,6 +251,93 @@ public class OpsOrderController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error in {Method}", "CompleteLensWork");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    // ─── Pre-Order Receive / Fulfill ───────────────────────────────────────────
+
+    /// <summary>
+    /// Lấy danh sách đơn pre-order đang chờ nhận hàng về kho
+    /// </summary>
+    [HttpGet("pre-order/receive")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetPreOrderReceiveList(
+        [FromQuery] string? status = "active",
+        [FromQuery] int? campaignId = null)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetPreOrderReceiveListAsync(status, campaignId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetPreOrderReceiveList");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Xác nhận đã nhận hàng pre-order về kho
+    /// </summary>
+    [HttpPut("pre-order/{id}/receive")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> ReceivePreOrder(int id, [FromBody] ReceivePreOrderRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _opsOrderService.ReceivePreOrderAsync(id, staffId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "ReceivePreOrder");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Xử lý giao hàng pre-order sau khi đã nhận (chuyển tiếp sang pack + ship)
+    /// </summary>
+    [HttpPut("pre-order/{id}/fulfill")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> FulfillPreOrder(int id, [FromBody] FulfillPreOrderRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _opsOrderService.FulfillPreOrderAsync(id, staffId, request);
+            if (result == null)
+                return NotFound(new { message = "No converted orders found for fulfillment." });
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "FulfillPreOrder");
             return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
         }
     }
