@@ -35,5 +35,7 @@ public partial class User
 
     public virtual ICollection<OrderStatusHistory> OrderStatusHistories { get; set; } = new List<OrderStatusHistory>();
 
+    public virtual ICollection<OrderItem> AssignedLensOrders { get; set; } = new List<OrderItem>();
+
     public virtual Role? Role { get; set; }
 }
