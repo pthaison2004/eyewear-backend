@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using VisionCare.BusinessLogicLayer.DTOs.OpsOrder;
+using VisionCare.BusinessLogicLayer.DTOs.OpsPreOrder;
+using VisionCare.BusinessLogicLayer.DTOs.Shipping;
+using VisionCare.BusinessLogicLayer.Interfaces;
 using VisionCare.DataAccessLayer.Models;
 
 namespace VisionCare.BusinessLogicLayer.Services;
@@ -32,10 +35,12 @@ public class OpsOrderService : IOpsOrderService
     };
 
     private readonly VisionCareContext _context;
+    private readonly IShippingService _shippingService;
 
-    public OpsOrderService(VisionCareContext context)
+    public OpsOrderService(VisionCareContext context, IShippingService shippingService)
     {
         _context = context;
+        _shippingService = shippingService;
     }
 
     public async Task<OrderOpsDetailDto> PackOrderAsync(int orderId, int staffId)
@@ -429,5 +434,269 @@ public class OpsOrderService : IOpsOrderService
                 IsLensCutComplete = i.LensCutCompletedAt.HasValue
             }).ToList()
         };
+    }
+
+    // ─── Pre-Order Receive / Fulfill ───────────────────────────────────────────
+
+    public async Task<List<PreOrderReceiveListDto>> GetPreOrderReceiveListAsync(string? status, int? campaignId)
+    {
+        var filterStatus = string.IsNullOrWhiteSpace(status) ? "active" : status.Trim();
+
+        var query = _context.PreOrderCampaigns
+            .Include(c => c.CampaignProducts)
+            .ThenInclude(cp => cp.Variant)
+            .ThenInclude(v => v!.Product)
+            .Include(c => c.Reservations)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filterStatus))
+        {
+            query = query.Where(c => c.Status.ToLower() == filterStatus.ToLower());
+        }
+
+        if (campaignId.HasValue)
+        {
+            query = query.Where(c => c.CampaignId == campaignId.Value);
+        }
+
+        var campaigns = await query.ToListAsync();
+        var result = new List<PreOrderReceiveListDto>();
+
+        foreach (var campaign in campaigns)
+        {
+            var paidReservations = campaign.Reservations
+                .Where(r => r.Status != null && r.Status.ToLower() == "paid")
+                .ToList();
+
+            var totalReserved = paidReservations.Sum(r => r.ReservedQuantity);
+            var totalReceived = campaign.CampaignProducts.Sum(cp => cp.ReceivedQuantity);
+            var pendingQuantity = totalReserved - totalReceived;
+            var isReadyToFulfill = pendingQuantity <= 0 && totalReserved > 0;
+
+            var items = campaign.CampaignProducts.Select(cp =>
+            {
+                var itemReserved = paidReservations
+                    .Where(r => r.VariantId == cp.VariantId)
+                    .Sum(r => r.ReservedQuantity);
+                return new PreOrderReceiveItemDto
+                {
+                    VariantId = cp.VariantId ?? 0,
+                    Sku = cp.Variant?.Sku ?? string.Empty,
+                    ProductName = cp.Variant?.Product?.ProductName ?? string.Empty,
+                    ReservedQuantity = itemReserved,
+                    ReceivedQuantity = cp.ReceivedQuantity,
+                    PendingQuantity = itemReserved - cp.ReceivedQuantity,
+                    CampaignPrice = cp.CampaignPrice
+                };
+            }).ToList();
+
+            result.Add(new PreOrderReceiveListDto
+            {
+                CampaignId = campaign.CampaignId,
+                CampaignCode = campaign.CampaignCode,
+                CampaignName = campaign.CampaignName,
+                Status = campaign.Status,
+                ReleaseDate = campaign.ReleaseDate,
+                TotalPaidReservations = paidReservations.Count,
+                TotalReservedQuantity = totalReserved,
+                TotalReceivedQuantity = totalReceived,
+                PendingQuantity = pendingQuantity,
+                IsReadyToFulfill = isReadyToFulfill,
+                Items = items
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<PreOrderReceiveResultDto> ReceivePreOrderAsync(int campaignId, int staffId, ReceivePreOrderRequestDto request)
+    {
+        var campaign = await _context.PreOrderCampaigns
+            .Include(c => c.CampaignProducts)
+            .ThenInclude(cp => cp.Variant)
+            .Include(c => c.Reservations)
+            .FirstOrDefaultAsync(c => c.CampaignId == campaignId);
+
+        if (campaign == null)
+        {
+            throw new KeyNotFoundException($"Pre-order campaign with ID {campaignId} not found.");
+        }
+
+        var warehouse = await _context.Warehouses.FindAsync(request.WarehouseId);
+        if (warehouse == null)
+        {
+            throw new KeyNotFoundException($"Warehouse with ID {request.WarehouseId} not found.");
+        }
+
+        var paidReservations = campaign.Reservations
+            .Where(r => r.Status != null && r.Status.ToLower() == "paid")
+            .ToList();
+
+        if (paidReservations.Count == 0)
+        {
+            throw new InvalidOperationException("No paid reservations found for this campaign.");
+        }
+
+        var variantIds = paidReservations.Select(r => r.VariantId).Distinct().ToList();
+        var campaignProducts = campaign.CampaignProducts
+            .Where(cp => cp.VariantId.HasValue && variantIds.Contains(cp.VariantId.Value))
+            .ToList();
+
+        if (campaignProducts.Count == 0)
+        {
+            throw new InvalidOperationException("No campaign products found for the reserved variants.");
+        }
+
+        var totalReserved = paidReservations.Sum(r => r.ReservedQuantity);
+
+        // Update ReceivedQuantity on each campaign product
+        foreach (var cp in campaignProducts)
+        {
+            cp.ReceivedQuantity += request.ReceivedQuantity;
+        }
+
+        // Update or create Inventory for the first variant+warehouse
+        var firstVariantId = campaignProducts.First().VariantId!.Value;
+        var inventory = await _context.Inventories
+            .FirstOrDefaultAsync(i => i.VariantId == firstVariantId && i.WarehouseId == request.WarehouseId);
+
+        if (inventory == null)
+        {
+            inventory = new Inventory
+            {
+                VariantId = firstVariantId,
+                WarehouseId = request.WarehouseId,
+                QuantityOnHand = request.ReceivedQuantity,
+                QuantityReserved = 0,
+                QuantityDefective = 0,
+                QuantityTransit = 0,
+                BatchNumber = request.BatchNumber,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Inventories.Add(inventory);
+        }
+        else
+        {
+            var previousOnHand = inventory.QuantityOnHand;
+            inventory.QuantityOnHand += request.ReceivedQuantity;
+            inventory.UpdatedAt = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(request.BatchNumber))
+            {
+                inventory.BatchNumber = request.BatchNumber;
+            }
+        }
+
+        // Record StockMovement
+        var stockMovement = new StockMovement
+        {
+            VariantId = firstVariantId,
+            WarehouseId = request.WarehouseId,
+            MovementType = "PREORDER_RECEIVE",
+            QuantityBefore = inventory.QuantityOnHand - request.ReceivedQuantity,
+            QuantityChange = request.ReceivedQuantity,
+            QuantityAfter = inventory.QuantityOnHand,
+            ReferenceType = "preorder",
+            ReferenceId = campaign.CampaignId,
+            PerformedBy = staffId,
+            PerformedAt = DateTime.UtcNow,
+            StaffNote = request.Note
+        };
+        _context.StockMovements.Add(stockMovement);
+
+        // Mark ALL paid reservations as fulfilled
+        foreach (var reservation in paidReservations)
+        {
+            reservation.Status = "fulfilled";
+            reservation.FulfilledAt = DateTime.UtcNow;
+        }
+
+        // Re-evaluate campaign status
+        var newTotalReceived = campaignProducts.Sum(cp => cp.ReceivedQuantity);
+        if (newTotalReceived >= totalReserved)
+        {
+            campaign.Status = "fulfilled";
+            campaign.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var remaining = Math.Max(0, totalReserved - newTotalReceived);
+
+        return new PreOrderReceiveResultDto
+        {
+            CampaignId = campaign.CampaignId,
+            CampaignCode = campaign.CampaignCode,
+            ReceivedQuantity = request.ReceivedQuantity,
+            TotalReceivedNow = newTotalReceived,
+            TotalReceived = newTotalReceived,
+            RemainingQuantity = remaining,
+            Status = campaign.Status,
+            Message = remaining > 0
+                ? $"Partial receive: {newTotalReceived}/{totalReserved} units received."
+                : $"Full receive complete: {newTotalReceived} units received."
+        };
+    }
+
+    public async Task<ShippingOrderDto?> FulfillPreOrderAsync(int campaignId, int staffId, FulfillPreOrderRequestDto request)
+    {
+        var campaign = await _context.PreOrderCampaigns
+            .Include(c => c.Reservations)
+            .FirstOrDefaultAsync(c => c.CampaignId == campaignId);
+
+        if (campaign == null)
+        {
+            throw new KeyNotFoundException($"Pre-order campaign with ID {campaignId} not found.");
+        }
+
+        var fulfilledReservations = campaign.Reservations
+            .Where(r => r.Status != null && r.Status.ToLower() == "fulfilled" && r.ConvertedOrderId.HasValue)
+            .ToList();
+
+        if (fulfilledReservations.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "No fulfilled reservations with converted orders found for this campaign.");
+        }
+
+        var reservation = fulfilledReservations.First();
+        var orderId = reservation.ConvertedOrderId!.Value;
+
+        var order = await _context.Orders.FindAsync(orderId);
+        if (order == null)
+        {
+            throw new KeyNotFoundException($"Converted order with ID {orderId} not found.");
+        }
+
+        var createShippingRequest = new CreateShippingOrderRequestDto
+        {
+            ShippingMethodId = request.ShippingMethodId,
+            WeightKg = request.WeightKg
+        };
+
+        var shippingOrder = await _shippingService.CreateShippingOrderAsync(orderId, staffId, createShippingRequest);
+
+        if (!string.IsNullOrWhiteSpace(request.Note))
+        {
+            var existingNote = order.StaffNote ?? string.Empty;
+            var noteEntry = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm}] [{staffId}] {request.Note}";
+            order.StaffNote = string.IsNullOrEmpty(existingNote)
+                ? noteEntry
+                : $"{existingNote}\n{noteEntry}";
+        }
+
+        var historyEntry = new OrderStatusHistory
+        {
+            OrderId = orderId,
+            FromStatus = order.OrderStatus ?? string.Empty,
+            ToStatus = "Dispatched",
+            Note = $"Pre-order campaign '{campaign.CampaignName}' fulfilled by staff ID {staffId}.",
+            ChangedBy = staffId,
+            ChangedAt = DateTime.UtcNow
+        };
+        _context.OrderStatusHistories.Add(historyEntry);
+
+        await _context.SaveChangesAsync();
+
+        return shippingOrder;
     }
 }
