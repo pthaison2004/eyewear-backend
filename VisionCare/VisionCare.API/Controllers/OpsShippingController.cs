@@ -7,7 +7,7 @@ using VisionCare.BusinessLogicLayer.Interfaces;
 
 namespace VisionCare.API.Controllers;
 
-[Route("api/v1/ops")]
+[Route("api/v1/ops/shipping")]
 [ApiController]
 [Authorize]
 public class OpsShippingController : ControllerBase
@@ -30,7 +30,7 @@ public class OpsShippingController : ControllerBase
     /// <summary>
     /// Lấy danh sách phương thức vận chuyển khả dụng
     /// </summary>
-    [HttpGet("shipping/methods")]
+    [HttpGet("methods")]
     [Authorize(Roles = "Operations,Manager,Admin")]
     public async Task<IActionResult> GetShippingMethods()
     {
@@ -42,12 +42,12 @@ public class OpsShippingController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error in {Method}", "GetShippingMethods");
-            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
         }
     }
 
     /// <summary>
-    /// Tạo đơn vận chuyển cho đơn hàng
+    /// Tao don van chuyen cho don hang
     /// </summary>
     [HttpPost("orders/{id}/shipping")]
     [Authorize(Roles = "Operations,Manager,Admin")]
@@ -57,7 +57,7 @@ public class OpsShippingController : ControllerBase
         {
             var staffId = GetCurrentUserId();
             if (staffId == 0)
-                return Unauthorized(new { message = "Không xác định được người dùng." });
+                return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
 
             var result = await _shippingService.CreateShippingOrderAsync(id, staffId, request);
             return Ok(result);
@@ -73,12 +73,12 @@ public class OpsShippingController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error in {Method}", "CreateShippingOrder");
-            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
         }
     }
 
     /// <summary>
-    /// Đánh dấu đơn hàng đã được giao cho đơn vị vận chuyển
+    /// Danh dau don hang da duoc giao cho don vi van chuyen
     /// </summary>
     [HttpPut("orders/{id}/ship")]
     [Authorize(Roles = "Operations,Manager,Admin")]
@@ -88,7 +88,7 @@ public class OpsShippingController : ControllerBase
         {
             var staffId = GetCurrentUserId();
             if (staffId == 0)
-                return Unauthorized(new { message = "Không xác định được người dùng." });
+                return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
 
             var result = await _shippingService.MarkOrderAsShippedAsync(id, staffId);
             if (result == null)
@@ -99,7 +99,107 @@ public class OpsShippingController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled error in {Method}", "MarkAsShipped");
-            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
+        }
+    }
+
+    /// <summary>
+    /// Lay danh sach trang thai van chuyen
+    /// </summary>
+    [HttpGet("statuses")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetShippingStatuses()
+    {
+        try
+        {
+            var statuses = await _shippingService.GetShippingStatusesAsync();
+            return Ok(statuses);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetShippingStatuses");
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
+        }
+    }
+
+    /// <summary>
+    /// Cap nhat trang thai van chuyen
+    /// </summary>
+    [HttpPut("orders/{id}/status")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> UpdateShippingStatus(int id, [FromBody] UpdateShippingStatusRequestDto request)
+    {
+        try
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+
+            var result = await _shippingService.UpdateShippingStatusAsync(id, staffId, request);
+            if (result == null)
+                return NotFound(new { message = $"No shipping order found with ID {id}." });
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "UpdateShippingStatus");
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
+        }
+    }
+
+    /// <summary>
+    /// Lay lich su trang thai van chuyen
+    /// </summary>
+    [HttpGet("orders/{id}/history")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetShippingHistory(int id)
+    {
+        try
+        {
+            var history = await _shippingService.GetShippingHistoryAsync(id);
+            return Ok(history);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetShippingHistory");
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
+        }
+    }
+
+    /// <summary>
+    /// Theo doi van don bang ma tracking
+    /// </summary>
+    [HttpGet("tracking/{trackingNo}")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> TrackShipping(string trackingNo)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(trackingNo))
+                return BadRequest(new { message = "Tracking number is required." });
+
+            var result = await _shippingService.TrackShippingAsync(trackingNo);
+            if (result == null)
+                return NotFound(new { message = $"No shipping order found for tracking number '{trackingNo}'." });
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "TrackShipping");
+            return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
         }
     }
 }

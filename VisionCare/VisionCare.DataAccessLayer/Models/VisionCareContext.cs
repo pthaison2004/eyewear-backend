@@ -47,6 +47,8 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<ShippingMethod> ShippingMethods { get; set; }
     public virtual DbSet<ShippingOrder> ShippingOrders { get; set; }
+    public virtual DbSet<ShippingStatus> ShippingStatuses { get; set; }
+    public virtual DbSet<ShippingStatusHistory> ShippingStatusHistories { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -378,6 +380,37 @@ public partial class VisionCareContext : DbContext
                 .WithMany(s => s.ShippingOrders)
                 .HasForeignKey(e => e.ShippingMethodId)
                 .HasConstraintName("FK__ShippingOrder__Method");
+        });
+
+        modelBuilder.Entity<ShippingStatus>(entity =>
+        {
+            entity.HasKey(e => e.ShippingStatusId);
+            entity.Property(e => e.StatusCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.StatusName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.StatusOrder).HasDefaultValue(0);
+        });
+
+        modelBuilder.Entity<ShippingStatusHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId);
+            entity.Property(e => e.CarrierStatusText).HasMaxLength(200);
+            entity.Property(e => e.Location).HasMaxLength(200);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.ShippingOrder)
+                .WithMany(s => s.StatusHistories)
+                .HasForeignKey(e => e.ShippingOrderId)
+                .HasConstraintName("FK__ShippingStatusHistory__ShippingOrder");
+
+            entity.HasOne(e => e.FromStatus)
+                .WithMany()
+                .HasForeignKey(e => e.FromStatusId)
+                .HasConstraintName("FK__ShippingStatusHistory__FromStatus");
+
+            entity.HasOne(e => e.ToStatus)
+                .WithMany()
+                .HasForeignKey(e => e.ToStatusId)
+                .HasConstraintName("FK__ShippingStatusHistory__ToStatus");
         });
 
         OnModelCreatingPartial(modelBuilder);
