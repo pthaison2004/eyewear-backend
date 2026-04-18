@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using VisionCare.DataAccessLayer.Models;
 using VisionCare.BusinessLogicLayer.DTOs.SalesPrescription;
 using VisionCare.BusinessLogicLayer.Services;
 
@@ -13,11 +15,16 @@ namespace VisionCare.API.Controllers;
 public class SalesPrescriptionController : ControllerBase
 {
     private readonly ISalesPrescriptionService _salesPrescriptionService;
+    private readonly VisionCareContext _context;
     private readonly ILogger<SalesPrescriptionController> _logger;
 
-    public SalesPrescriptionController(ISalesPrescriptionService salesPrescriptionService, ILogger<SalesPrescriptionController> logger)
+    public SalesPrescriptionController(
+        ISalesPrescriptionService salesPrescriptionService,
+        VisionCareContext context,
+        ILogger<SalesPrescriptionController> logger)
     {
         _salesPrescriptionService = salesPrescriptionService;
+        _context = context;
         _logger = logger;
     }
 
@@ -52,8 +59,8 @@ public class SalesPrescriptionController : ControllerBase
     /// <summary>
     /// Xem chi tiết đơn kê đơn
     /// </summary>
-    [HttpGet("orders/{id}/prescription-review")]
-    public async Task<IActionResult> GetPrescriptionReview(int id)
+    [HttpGet("orders/{orderId}/prescription-review")]
+    public async Task<IActionResult> GetPrescriptionReview(int orderId)
     {
         try
         {
@@ -61,7 +68,8 @@ public class SalesPrescriptionController : ControllerBase
             if (staffId == 0)
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            var result = await _salesPrescriptionService.GetPrescriptionReviewAsync(id);
+            var prescriptionId = await GetPrescriptionIdFromOrderAsync(orderId);
+            var result = await _salesPrescriptionService.GetPrescriptionReviewAsync(prescriptionId);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -78,8 +86,8 @@ public class SalesPrescriptionController : ControllerBase
     /// <summary>
     /// Xác minh hoặc từ chối đơn kê đơn
     /// </summary>
-    [HttpPut("orders/{id}/verify-prescription")]
-    public async Task<IActionResult> VerifyPrescription(int id, [FromBody] VerifyPrescriptionRequestDto request)
+    [HttpPut("orders/{orderId}/verify-prescription")]
+    public async Task<IActionResult> VerifyPrescription(int orderId, [FromBody] VerifyPrescriptionRequestDto request)
     {
         try
         {
@@ -87,7 +95,8 @@ public class SalesPrescriptionController : ControllerBase
             if (staffId == 0)
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            var result = await _salesPrescriptionService.VerifyPrescriptionAsync(id, staffId, request);
+            var prescriptionId = await GetPrescriptionIdFromOrderAsync(orderId);
+            var result = await _salesPrescriptionService.VerifyPrescriptionAsync(prescriptionId, staffId, request);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -108,8 +117,8 @@ public class SalesPrescriptionController : ControllerBase
     /// <summary>
     /// Liên hệ khách hàng để điều chỉnh đơn kê đơn
     /// </summary>
-    [HttpPut("orders/{id}/prescription/adjust")]
-    public async Task<IActionResult> AdjustPrescription(int id, [FromBody] AdjustPrescriptionRequestDto request)
+    [HttpPut("orders/{orderId}/prescription/adjust")]
+    public async Task<IActionResult> AdjustPrescription(int orderId, [FromBody] AdjustPrescriptionRequestDto request)
     {
         try
         {
@@ -117,7 +126,8 @@ public class SalesPrescriptionController : ControllerBase
             if (staffId == 0)
                 return Unauthorized(new { message = "Không xác định được người dùng." });
 
-            var result = await _salesPrescriptionService.AdjustPrescriptionAsync(id, staffId, request);
+            var prescriptionId = await GetPrescriptionIdFromOrderAsync(orderId);
+            var result = await _salesPrescriptionService.AdjustPrescriptionAsync(prescriptionId, staffId, request);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -139,5 +149,16 @@ public class SalesPrescriptionController : ControllerBase
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(idStr, out var id) ? id : 0;
+    }
+
+    private async Task<int> GetPrescriptionIdFromOrderAsync(int orderId)
+    {
+        var orderItem = await _context.OrderItems
+            .FirstOrDefaultAsync(oi => oi.OrderId == orderId && oi.PrescriptionId != null);
+
+        if (orderItem == null)
+            throw new KeyNotFoundException($"Order {orderId} does not have a linked prescription.");
+
+        return orderItem.PrescriptionId!.Value;
     }
 }
