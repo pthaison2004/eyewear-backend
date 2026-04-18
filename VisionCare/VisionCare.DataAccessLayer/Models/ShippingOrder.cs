@@ -33,4 +33,5 @@ public class ShippingOrder
 
     public virtual Order? Order { get; set; }
     public virtual ShippingMethod? ShippingMethod { get; set; }
+    public virtual ICollection<ShippingStatusHistory> StatusHistories { get; set; } = new List<ShippingStatusHistory>();
 }

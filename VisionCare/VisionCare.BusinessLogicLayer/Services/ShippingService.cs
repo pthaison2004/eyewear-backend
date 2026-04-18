@@ -226,6 +226,147 @@ public class ShippingService : IShippingService
         return MapToDto(shippingOrder, shippingOrder.Order, shippingOrder.ShippingMethod);
     }
 
+    public async Task<List<ShippingStatusDto>> GetShippingStatusesAsync()
+    {
+        return await _context.ShippingStatuses
+            .OrderBy(s => s.StatusOrder)
+            .Select(s => new ShippingStatusDto
+            {
+                ShippingStatusId = s.ShippingStatusId,
+                StatusCode = s.StatusCode,
+                StatusName = s.StatusName,
+                StatusOrder = s.StatusOrder
+            })
+            .ToListAsync();
+    }
+
+    public async Task<ShippingOrderDto?> UpdateShippingStatusAsync(int shippingOrderId, int staffId, UpdateShippingStatusRequestDto request)
+    {
+        var shippingOrder = await _context.ShippingOrders
+            .Include(s => s.Order)
+            .Include(s => s.ShippingMethod)
+            .Include(s => s.StatusHistories)
+            .FirstOrDefaultAsync(s => s.ShippingOrderId == shippingOrderId);
+
+        if (shippingOrder == null)
+        {
+            return null;
+        }
+
+        var targetStatus = await _context.ShippingStatuses
+            .FirstOrDefaultAsync(s => s.ShippingStatusId == request.StatusId);
+
+        if (targetStatus == null)
+        {
+            throw new KeyNotFoundException($"Shipping status with ID {request.StatusId} not found.");
+        }
+
+        var currentStatus = await _context.ShippingStatuses
+            .FirstOrDefaultAsync(s => s.ShippingStatusId == shippingOrder.ShippingStatusId);
+
+        if (currentStatus != null && currentStatus.StatusOrder >= 5)
+        {
+            throw new InvalidOperationException(
+                $"Cannot update shipping status. Current status '{currentStatus.StatusName}' is a terminal state and cannot be changed.");
+        }
+
+        var fromStatusId = shippingOrder.ShippingStatusId;
+        shippingOrder.ShippingStatusId = request.StatusId;
+        shippingOrder.CarrierStatus = targetStatus.StatusName;
+
+        if (targetStatus.StatusOrder == 5)
+        {
+            shippingOrder.DeliveredAt = DateTime.UtcNow;
+        }
+
+        var history = new ShippingStatusHistory
+        {
+            ShippingOrderId = shippingOrderId,
+            FromStatusId = fromStatusId,
+            ToStatusId = request.StatusId,
+            CarrierStatusText = request.Note,
+            Location = request.Location,
+            UpdatedBy = staffId,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _context.ShippingStatusHistories.Add(history);
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(shippingOrder, shippingOrder.Order, shippingOrder.ShippingMethod);
+    }
+
+    public async Task<List<ShippingStatusHistoryDto>> GetShippingHistoryAsync(int shippingOrderId)
+    {
+        return await _context.ShippingStatusHistories
+            .Include(h => h.FromStatus)
+            .Include(h => h.ToStatus)
+            .Where(h => h.ShippingOrderId == shippingOrderId)
+            .OrderByDescending(h => h.UpdatedAt)
+            .Select(h => new ShippingStatusHistoryDto
+            {
+                HistoryId = h.HistoryId,
+                ShippingOrderId = h.ShippingOrderId,
+                FromStatus = h.FromStatus != null ? h.FromStatus.StatusName : null,
+                ToStatus = h.ToStatus!.StatusName,
+                CarrierStatusText = h.CarrierStatusText,
+                Location = h.Location,
+                UpdatedAt = h.UpdatedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<ShippingTrackingDto?> TrackShippingAsync(string trackingNo)
+    {
+        var shippingOrder = await _context.ShippingOrders
+            .Include(s => s.StatusHistories)
+                .ThenInclude(h => h.FromStatus)
+            .Include(s => s.StatusHistories)
+                .ThenInclude(h => h.ToStatus)
+            .FirstOrDefaultAsync(s =>
+                s.CarrierTrackingNo == trackingNo ||
+                s.CarrierOrderNo == trackingNo ||
+                s.ShippingOrderCode == trackingNo);
+
+        if (shippingOrder == null)
+        {
+            return null;
+        }
+
+        var currentStatus = await _context.ShippingStatuses
+            .FirstOrDefaultAsync(s => s.ShippingStatusId == shippingOrder.ShippingStatusId);
+
+        var fullAddress = string.Join(", ",
+            new[] { shippingOrder.StreetAddress, shippingOrder.WardCode, shippingOrder.DistrictCode, shippingOrder.ProvinceCode }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
+
+        var history = shippingOrder.StatusHistories
+            .OrderByDescending(h => h.UpdatedAt)
+            .Select(h => new ShippingStatusHistoryDto
+            {
+                HistoryId = h.HistoryId,
+                ShippingOrderId = h.ShippingOrderId,
+                FromStatus = h.FromStatus != null ? h.FromStatus.StatusName : null,
+                ToStatus = h.ToStatus!.StatusName,
+                CarrierStatusText = h.CarrierStatusText,
+                Location = h.Location,
+                UpdatedAt = h.UpdatedAt
+            })
+            .ToList();
+
+        return new ShippingTrackingDto
+        {
+            ShippingOrderId = shippingOrder.ShippingOrderId,
+            ShippingOrderCode = shippingOrder.ShippingOrderCode,
+            CarrierTrackingNo = shippingOrder.CarrierTrackingNo,
+            CarrierOrderNo = shippingOrder.CarrierOrderNo,
+            CurrentStatus = currentStatus?.StatusName ?? string.Empty,
+            RecipientName = shippingOrder.RecipientName,
+            FullAddress = fullAddress,
+            History = history
+        };
+    }
+
     private static ShippingOrderDto MapToDto(ShippingOrder so, Order? order, ShippingMethod? method)
     {
         var fullAddress = string.Join(", ",
