@@ -1,4 +1,5 @@
 using VisionCare.BusinessLogicLayer.DTOs.SalesOrder;
+using VisionCare.BusinessLogicLayer.DTOs.SalesPayment;
 
 namespace VisionCare.BusinessLogicLayer.Services;
 
@@ -11,4 +12,5 @@ public interface ISalesOrderService
     Task<SalesOrderDetailDto> RejectOrderAsync(int orderId, int staffId, RejectOrderRequestDto request);
     Task<SalesOrderDetailDto> AssignOrderAsync(int orderId, int staffId, AssignOrderRequestDto request);
     Task<SalesOrderDetailDto> AddStaffNoteAsync(int orderId, int staffId, StaffNoteRequestDto request);
+    Task<SalesOrderDetailDto> MarkOrderPaidAsync(int orderId, int staffId, MarkPaidRequestDto request);
 }
