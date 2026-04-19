@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VisionCare.BusinessLogicLayer.DTOs.SalesOrder;
+using VisionCare.BusinessLogicLayer.DTOs.SalesPayment;
 using VisionCare.DataAccessLayer.Models;
 
 namespace VisionCare.BusinessLogicLayer.Services;
@@ -74,6 +75,13 @@ public class SalesOrderService : ISalesOrderService
         {
             throw new InvalidOperationException(
                 $"Không thể xác nhận đơn hàng. Trạng thái hiện tại là '{order.OrderStatus}', chỉ đơn ở trạng thái 'Pending' mới được phép xác nhận.");
+        }
+
+        // Kiểm tra đã thanh toán chưa
+        if (!string.Equals(order.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Không thể xác nhận đơn hàng. Đơn hàng chưa được thanh toán (PaymentStatus: '{order.PaymentStatus}'). Vui lòng xác nhận thanh toán trước.");
         }
 
         order.OrderStatus = "Confirmed";
@@ -183,6 +191,44 @@ public class SalesOrderService : ISalesOrderService
 
         await _context.SaveChangesAsync();
 
+        return MapToDetailDto(order);
+    }
+
+    public async Task<SalesOrderDetailDto> MarkOrderPaidAsync(int orderId, int staffId, MarkPaidRequestDto request)
+    {
+        var order = await _context.Orders
+            .Include(o => o.Customer)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Variant)
+                .ThenInclude(v => v!.Product)
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Prescription)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null)
+            throw new KeyNotFoundException($"Không tìm thấy đơn hàng với ID {orderId}.");
+
+        if (string.Equals(order.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Đơn hàng đã được thanh toán.");
+
+        if (!string.Equals(order.PaymentStatus, "Pending", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(order.PaymentStatus, "Unpaid", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Không thể cập nhật thanh toán. Trạng thái hiện tại là '{order.PaymentStatus}'.");
+
+        order.PaymentStatus = "Paid";
+
+        var paymentInfo = $"PAYMENT [{DateTime.UtcNow:yyyy-MM-dd HH:mm}] Method={request.PaymentMethod}";
+        if (request.AmountPaid.HasValue)
+            paymentInfo += $", Amount={request.AmountPaid.Value:N0}VND";
+        if (!string.IsNullOrWhiteSpace(request.TransactionRef))
+            paymentInfo += $", Ref={request.TransactionRef}";
+        paymentInfo += $", Staff={staffId}";
+
+        AppendStaffNote(order, staffId, paymentInfo);
+        if (!string.IsNullOrWhiteSpace(request.Note))
+            AppendStaffNote(order, staffId, $"Note: {request.Note}");
+
+        await _context.SaveChangesAsync();
         return MapToDetailDto(order);
     }
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using VisionCare.BusinessLogicLayer.DTOs.SalesOrder;
+using VisionCare.BusinessLogicLayer.DTOs.SalesPayment;
 using VisionCare.BusinessLogicLayer.Services;
 
 namespace VisionCare.API.Controllers;
@@ -25,6 +26,37 @@ public class SalesOrderController : ControllerBase
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(idStr, out var id) ? id : 0;
+    }
+
+    /// <summary>
+    /// Xác nhận thanh toán đơn hàng (chuyển PaymentStatus → Paid)
+    /// </summary>
+    [HttpPut("{id}/payment")]
+    [Authorize(Roles = "Sales,Manager,Admin")]
+    public async Task<IActionResult> MarkOrderPaid(int id, [FromBody] MarkPaidRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _salesOrderService.MarkOrderPaidAsync(id, staffId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "MarkOrderPaid");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
     }
 
     /// <summary>
