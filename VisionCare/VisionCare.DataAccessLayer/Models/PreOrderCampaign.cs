@@ -19,6 +19,11 @@ public partial class PreOrderCampaign
     public int CurrentReserved { get; set; }
     public string Status { get; set; } = "draft";
     public bool IsFeatured { get; set; }
+
+    // Deposit configuration (Admin-adjustable)
+    public decimal? DepositRatio { get; set; }  // Tỉ lệ cọc: 0.3 = 30%
+    public decimal? MinDepositAmount { get; set; }  // Số tiền cọc tối thiểu (VND)
+
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

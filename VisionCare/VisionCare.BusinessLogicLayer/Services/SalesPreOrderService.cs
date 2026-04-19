@@ -189,4 +189,135 @@ public class SalesPreOrderService : ISalesPreOrderService
             Note = request.Note
         };
     }
+
+    public async Task<PreOrderCampaignDto> CreateCampaignAsync(CreatePreOrderCampaignRequestDto request, int staffId)
+    {
+        var year = DateTime.UtcNow.Year;
+
+        // Auto-generate CampaignCode: PO-{year}-{seq}
+        var seqPrefix = $"PO-{year}-";
+        var lastSeq = await _context.PreOrderCampaigns
+            .Where(c => c.CampaignCode.StartsWith(seqPrefix))
+            .Select(c => c.CampaignCode)
+            .ToListAsync();
+
+        int nextSeq = 1;
+        if (lastSeq.Count > 0)
+        {
+            var lastCampaignCode = lastSeq.OrderByDescending(x => x).First();
+            if (lastCampaignCode.Length > seqPrefix.Length)
+            {
+                var seqStr = lastCampaignCode.Substring(seqPrefix.Length);
+                if (int.TryParse(seqStr, out var lastNum))
+                    nextSeq = lastNum + 1;
+            }
+        }
+
+        var campaignCode = $"{seqPrefix}{nextSeq:D3}"; // e.g., PO-2026-001
+
+        var campaign = new PreOrderCampaign
+        {
+            CampaignCode = campaignCode,
+            CampaignName = request.CampaignName,
+            Description = request.Description,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            ReleaseDate = request.ReleaseDate,
+            DiscountPercent = request.DiscountPercent,
+            DiscountAmount = request.DiscountAmount,
+            MaxQuantity = request.MaxQuantity,
+            MaxPerCustomer = request.MaxPerCustomer,
+            IsFeatured = request.IsFeatured,
+            Status = "draft",
+            DepositRatio = request.DepositRatio,
+            MinDepositAmount = request.MinDepositAmount,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.PreOrderCampaigns.Add(campaign);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Pre-order campaign {CampaignCode} created by staff {StaffId}",
+            campaignCode, staffId);
+
+        return MapToDto(campaign);
+    }
+
+    public async Task<PreOrderCampaignDto?> UpdateCampaignAsync(int campaignId, UpdatePreOrderCampaignRequestDto request, int staffId)
+    {
+        var campaign = await _context.PreOrderCampaigns
+            .FirstOrDefaultAsync(c => c.CampaignId == campaignId);
+
+        if (campaign == null)
+            return null;
+
+        if (request.CampaignName != null)
+            campaign.CampaignName = request.CampaignName;
+        if (request.Description != null)
+            campaign.Description = request.Description;
+        if (request.StartDate.HasValue)
+            campaign.StartDate = request.StartDate.Value;
+        if (request.EndDate.HasValue)
+            campaign.EndDate = request.EndDate.Value;
+        if (request.ReleaseDate.HasValue)
+            campaign.ReleaseDate = request.ReleaseDate.Value;
+        if (request.DiscountPercent.HasValue)
+            campaign.DiscountPercent = request.DiscountPercent.Value;
+        if (request.DiscountAmount.HasValue)
+            campaign.DiscountAmount = request.DiscountAmount.Value;
+        if (request.MaxQuantity.HasValue)
+            campaign.MaxQuantity = request.MaxQuantity.Value;
+        if (request.MaxPerCustomer.HasValue)
+            campaign.MaxPerCustomer = request.MaxPerCustomer.Value;
+        if (request.Status != null)
+            campaign.Status = request.Status;
+        if (request.IsFeatured.HasValue)
+            campaign.IsFeatured = request.IsFeatured.Value;
+
+        // Deposit fields - Admin adjustable
+        if (request.DepositRatio.HasValue)
+            campaign.DepositRatio = request.DepositRatio.Value;
+        if (request.MinDepositAmount.HasValue)
+            campaign.MinDepositAmount = request.MinDepositAmount.Value;
+
+        campaign.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Pre-order campaign {CampaignId} updated by staff {StaffId}",
+            campaignId, staffId);
+
+        return MapToDto(campaign);
+    }
+
+    public async Task<PreOrderCampaignDto?> GetCampaignDetailAsync(int campaignId)
+    {
+        var campaign = await _context.PreOrderCampaigns
+            .FirstOrDefaultAsync(c => c.CampaignId == campaignId);
+
+        return campaign == null ? null : MapToDto(campaign);
+    }
+
+    private static PreOrderCampaignDto MapToDto(PreOrderCampaign c) => new PreOrderCampaignDto
+    {
+        CampaignId = c.CampaignId,
+        CampaignCode = c.CampaignCode,
+        CampaignName = c.CampaignName,
+        Description = c.Description,
+        StartDate = c.StartDate,
+        EndDate = c.EndDate,
+        ReleaseDate = c.ReleaseDate,
+        DiscountPercent = c.DiscountPercent,
+        DiscountAmount = c.DiscountAmount,
+        MaxQuantity = c.MaxQuantity,
+        MaxPerCustomer = c.MaxPerCustomer,
+        CurrentReserved = c.CurrentReserved,
+        Status = c.Status,
+        IsFeatured = c.IsFeatured,
+        DepositRatio = c.DepositRatio,
+        MinDepositAmount = c.MinDepositAmount,
+        CreatedAt = c.CreatedAt,
+        UpdatedAt = c.UpdatedAt
+    };
 }

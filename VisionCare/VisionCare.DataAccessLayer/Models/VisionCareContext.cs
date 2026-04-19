@@ -54,6 +54,8 @@ public partial class VisionCareContext : DbContext
     public virtual DbSet<Inventory> Inventories { get; set; }
     public virtual DbSet<StockMovement> StockMovements { get; set; }
 
+    public virtual DbSet<Supplier> Suppliers { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -305,6 +307,10 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.Status).HasMaxLength(50);
             entity.Property(e => e.DiscountAmount).HasPrecision(18, 2);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+
+            // Deposit configuration
+            entity.Property(e => e.DepositRatio).HasPrecision(5, 4); // e.g., 0.3000 = 30%
+            entity.Property(e => e.MinDepositAmount).HasPrecision(18, 0); // VND, no decimals
         });
 
         modelBuilder.Entity<PreOrderCampaignProduct>(entity =>
@@ -481,6 +487,14 @@ public partial class VisionCareContext : DbContext
                 .WithMany(u => u.StockMovements)
                 .HasForeignKey(e => e.PerformedBy)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Supplier>(entity =>
+        {
+            entity.HasKey(e => e.SupplierId);
+            entity.Property(e => e.SupplierCode).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.SupplierName).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
         });
 
         OnModelCreatingPartial(modelBuilder);
