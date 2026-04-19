@@ -202,4 +202,37 @@ public class OpsShippingController : ControllerBase
             return StatusCode(500, new { message = "Da xay ra loi khi xu ly yeu cau." });
         }
     }
+
+    /// <summary>
+    /// Xác nhận giao hàng thành công (cập nhật cả ShippingOrder + Order về Delivered)
+    /// </summary>
+    [HttpPut("orders/{id}/delivered")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> MarkAsDelivered(int id)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _shippingService.MarkAsDeliveredAsync(id, staffId);
+            if (result == null)
+                return NotFound(new { message = "No shipping order found for this order." });
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in MarkAsDelivered");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
 }
