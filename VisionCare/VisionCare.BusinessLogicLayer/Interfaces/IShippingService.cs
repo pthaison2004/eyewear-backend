@@ -11,6 +11,7 @@ public interface IShippingService
     Task<ShippingOrderDto?> UpdateShippingStatusAsync(int shippingOrderId, int staffId, UpdateShippingStatusRequestDto request);
     Task<List<ShippingStatusHistoryDto>> GetShippingHistoryAsync(int shippingOrderId);
     Task<ShippingTrackingDto?> TrackShippingAsync(string trackingNo);
+    Task<ShippingOrderDto?> MarkAsDeliveredAsync(int orderId, int staffId);
 }
 
 public class ShippingStatusDto

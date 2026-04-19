@@ -367,6 +367,78 @@ public class ShippingService : IShippingService
         };
     }
 
+    public async Task<ShippingOrderDto?> MarkAsDeliveredAsync(int orderId, int staffId)
+    {
+        var shippingOrder = await _context.ShippingOrders
+            .Include(s => s.Order)
+            .Include(s => s.ShippingMethod)
+            .Include(s => s.StatusHistories)
+            .Where(s => s.OrderId == orderId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (shippingOrder == null)
+        {
+            throw new InvalidOperationException("No shipping order found for this order.");
+        }
+
+        if (shippingOrder.ShippingStatusId >= 5)
+        {
+            throw new InvalidOperationException("Already delivered or terminal.");
+        }
+
+        shippingOrder.ShippingStatusId = 5;
+        shippingOrder.DeliveredAt = DateTime.UtcNow;
+        shippingOrder.CarrierStatus = "Delivered";
+
+        var order = shippingOrder.Order;
+        if (order == null)
+        {
+            throw new InvalidOperationException("No related order found for this shipping order.");
+        }
+
+        var terminalStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Cancelled",
+            "Delivered"
+        };
+
+        if (terminalStatuses.Contains(order.OrderStatus ?? string.Empty))
+        {
+            throw new InvalidOperationException(
+                $"Order status '{order.OrderStatus}' is already terminal and cannot be updated.");
+        }
+
+        var fromStatus = order.OrderStatus ?? string.Empty;
+        order.OrderStatus = "Delivered";
+
+        var orderHistory = new OrderStatusHistory
+        {
+            OrderId = orderId,
+            FromStatus = fromStatus,
+            ToStatus = "Delivered",
+            Note = "Delivery confirmed by staff",
+            ChangedBy = staffId,
+            ChangedAt = DateTime.UtcNow
+        };
+        _context.OrderStatusHistories.Add(orderHistory);
+
+        var shippingHistory = new ShippingStatusHistory
+        {
+            ShippingOrderId = shippingOrder.ShippingOrderId,
+            FromStatusId = shippingOrder.ShippingStatusId,
+            ToStatusId = 5,
+            CarrierStatusText = "Delivery confirmed",
+            UpdatedBy = staffId,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _context.ShippingStatusHistories.Add(shippingHistory);
+
+        await _context.SaveChangesAsync();
+
+        return MapToDto(shippingOrder, order, shippingOrder.ShippingMethod);
+    }
+
     private static ShippingOrderDto MapToDto(ShippingOrder so, Order? order, ShippingMethod? method)
     {
         var fullAddress = string.Join(", ",
