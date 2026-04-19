@@ -103,6 +103,86 @@ public class SalesPreOrderController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Tạo chiến dịch pre-order mới
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CreateCampaign([FromBody] CreatePreOrderCampaignRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _salesPreOrderService.CreateCampaignAsync(request, staffId);
+            return CreatedAtAction(nameof(GetCampaignDetail), new { id = result.CampaignId }, result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "CreateCampaign");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Cập nhật chiến dịch pre-order
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateCampaign(int id, [FromBody] UpdatePreOrderCampaignRequestDto request)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _salesPreOrderService.UpdateCampaignAsync(id, request, staffId);
+            if (result == null)
+                return NotFound(new { message = $"Không tìm thấy chiến dịch với ID: {id}" });
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "UpdateCampaign");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
+    /// Lấy chi tiết chiến dịch pre-order
+    /// </summary>
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetCampaignDetail(int id)
+    {
+        try
+        {
+            var staffId = GetCurrentUserId();
+            if (staffId == 0)
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var result = await _salesPreOrderService.GetCampaignDetailAsync(id);
+            if (result == null)
+                return NotFound(new { message = $"Không tìm thấy chiến dịch với ID: {id}" });
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetCampaignDetail");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
     private int GetCurrentUserId()
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
