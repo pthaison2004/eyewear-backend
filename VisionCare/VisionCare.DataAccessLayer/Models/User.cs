@@ -33,5 +33,11 @@ public partial class User
 
     public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();
 
+    public virtual ICollection<OrderStatusHistory> OrderStatusHistories { get; set; } = new List<OrderStatusHistory>();
+
+    public virtual ICollection<OrderItem> AssignedLensOrders { get; set; } = new List<OrderItem>();
+
+    public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
+
     public virtual Role? Role { get; set; }
 }

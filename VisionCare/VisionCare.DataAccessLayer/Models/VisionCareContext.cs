@@ -35,7 +35,26 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<Role> Roles { get; set; }
 
+    public virtual DbSet<PrescriptionValidationRule> PrescriptionValidationRules { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<PreOrderCampaign> PreOrderCampaigns { get; set; }
+    public virtual DbSet<PreOrderCampaignProduct> PreOrderCampaignProducts { get; set; }
+    public virtual DbSet<PreOrderReservation> PreOrderReservations { get; set; }
+    public virtual DbSet<Complaint> Complaints { get; set; }
+    public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
+
+    public virtual DbSet<ShippingMethod> ShippingMethods { get; set; }
+    public virtual DbSet<ShippingOrder> ShippingOrders { get; set; }
+    public virtual DbSet<ShippingStatus> ShippingStatuses { get; set; }
+    public virtual DbSet<ShippingStatusHistory> ShippingStatusHistories { get; set; }
+
+    public virtual DbSet<Warehouse> Warehouses { get; set; }
+    public virtual DbSet<Inventory> Inventories { get; set; }
+    public virtual DbSet<StockMovement> StockMovements { get; set; }
+
+    public virtual DbSet<Supplier> Suppliers { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -87,6 +106,10 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Variant).WithMany(p => p.OrderItems)
                 .HasForeignKey(d => d.VariantId)
                 .HasConstraintName("FK__OrderItem__Varia__412EB0B6");
+
+            entity.HasOne(d => d.AssignedLensMaker).WithMany(p => p.AssignedLensOrders)
+                .HasForeignKey(d => d.AssignedLensMakerId)
+                .HasConstraintName("FK__OrderItem__LensMk__7B5A6A1C");
         });
 
         modelBuilder.Entity<Prescription>(entity =>
@@ -238,6 +261,240 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Prescription).WithMany(p => p.CartItems)
                 .HasForeignKey(d => d.PrescriptionId)
                 .HasConstraintName("FK__CartItems__Prescr__60722E0F");
+        });
+
+        modelBuilder.Entity<OrderStatusHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId).HasName("PK__OrderStat__FD25C5D9E3F5A3B6");
+
+            entity.Property(e => e.FromStatus).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ToStatus).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Note).HasColumnType("nvarchar(max)");
+            entity.Property(e => e.ChangedAt)
+                .HasDefaultValueSql("SYSUTCDATETIME()")
+                .HasColumnType("datetime2");
+
+            entity.HasOne(e => e.Order)
+                .WithMany(o => o.OrderStatusHistories)
+                .HasForeignKey(e => e.OrderId)
+                .HasConstraintName("FK__OrderStatus__Order__7C7BAF4E");
+
+            entity.HasOne(e => e.ChangedByUser)
+                .WithMany(u => u.OrderStatusHistories)
+                .HasForeignKey(e => e.ChangedBy)
+                .HasConstraintName("FK__OrderStatus__User__7D6B9B87");
+        });
+
+
+        modelBuilder.Entity<PrescriptionValidationRule>(entity =>
+        {
+            entity.HasKey(e => e.RuleId).HasName("PK__PrescriptValidationRule");
+            entity.Property(e => e.RuleName).HasMaxLength(100);
+            entity.Property(e => e.RuleType).HasMaxLength(50);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.MinValue).HasPrecision(10, 2);
+            entity.Property(e => e.MaxValue).HasPrecision(10, 2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+            entity.Property(e => e.SortOrder).HasDefaultValue(0);
+        });
+
+        modelBuilder.Entity<PreOrderCampaign>(entity =>
+        {
+            entity.HasKey(e => e.CampaignId);
+            entity.Property(e => e.CampaignCode).HasMaxLength(50);
+            entity.Property(e => e.CampaignName).HasMaxLength(200);
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.DiscountAmount).HasPrecision(18, 2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+
+            // Deposit configuration
+            entity.Property(e => e.DepositRatio).HasPrecision(5, 4); // e.g., 0.3000 = 30%
+            entity.Property(e => e.MinDepositAmount).HasPrecision(18, 0); // VND, no decimals
+        });
+
+        modelBuilder.Entity<PreOrderCampaignProduct>(entity =>
+        {
+            entity.HasKey(e => e.CampaignProductId);
+            entity.Property(e => e.CampaignPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<PreOrderReservation>(entity =>
+        {
+            entity.HasKey(e => e.ReservationId);
+            entity.Property(e => e.ReservationCode).HasMaxLength(50);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Status).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<Complaint>(entity =>
+        {
+            entity.HasKey(e => e.ComplaintId);
+            entity.Property(e => e.ComplaintType).HasMaxLength(100);
+            entity.Property(e => e.Subject).HasMaxLength(200);
+            entity.Property(e => e.ComplaintStatus).HasMaxLength(50);
+            entity.Property(e => e.Priority).HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnType("datetime");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Complaints)
+                .HasForeignKey(d => d.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.Customer).WithMany()
+                .HasForeignKey(d => d.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.AssignedToUser).WithMany()
+                .HasForeignKey(d => d.AssignedTo)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.ProcessedByUser).WithMany()
+                .HasForeignKey(d => d.ProcessedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.ResolvedByUser).WithMany()
+                .HasForeignKey(d => d.ResolvedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ShippingMethod>(entity =>
+        {
+            entity.HasKey(e => e.ShippingMethodId);
+            entity.Property(e => e.MethodCode).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.MethodName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.BaseFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.FeePerKg).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.FreeShippingThreshold).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.MaxCodAmount).HasColumnType("decimal(18,2)");
+        });
+
+        modelBuilder.Entity<ShippingOrder>(entity =>
+        {
+            entity.HasKey(e => e.ShippingOrderId);
+            entity.Property(e => e.ShippingOrderCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CarrierTrackingNo).HasMaxLength(100);
+            entity.Property(e => e.CarrierOrderNo).HasMaxLength(100);
+            entity.Property(e => e.RecipientName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.ProvinceCode).HasMaxLength(20);
+            entity.Property(e => e.DistrictCode).HasMaxLength(20);
+            entity.Property(e => e.WardCode).HasMaxLength(20);
+            entity.Property(e => e.StreetAddress).HasMaxLength(500);
+            entity.Property(e => e.ShippingFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CodFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.InsuranceFee).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.TotalShippingCost).HasColumnType("decimal(18,2)");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Order)
+                .WithMany(o => o.ShippingOrders)
+                .HasForeignKey(e => e.OrderId)
+                .HasConstraintName("FK__ShippingOrder__Order");
+
+            entity.HasOne(e => e.ShippingMethod)
+                .WithMany(s => s.ShippingOrders)
+                .HasForeignKey(e => e.ShippingMethodId)
+                .HasConstraintName("FK__ShippingOrder__Method");
+        });
+
+        modelBuilder.Entity<ShippingStatus>(entity =>
+        {
+            entity.HasKey(e => e.ShippingStatusId);
+            entity.Property(e => e.StatusCode).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.StatusName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.StatusOrder).HasDefaultValue(0);
+        });
+
+        modelBuilder.Entity<ShippingStatusHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId);
+            entity.Property(e => e.CarrierStatusText).HasMaxLength(200);
+            entity.Property(e => e.Location).HasMaxLength(200);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.ShippingOrder)
+                .WithMany(s => s.StatusHistories)
+                .HasForeignKey(e => e.ShippingOrderId)
+                .HasConstraintName("FK__ShippingStatusHistory__ShippingOrder");
+
+            entity.HasOne(e => e.FromStatus)
+                .WithMany()
+                .HasForeignKey(e => e.FromStatusId)
+                .HasConstraintName("FK__ShippingStatusHistory__FromStatus");
+
+            entity.HasOne(e => e.ToStatus)
+                .WithMany()
+                .HasForeignKey(e => e.ToStatusId)
+                .HasConstraintName("FK__ShippingStatusHistory__ToStatus");
+        });
+
+        modelBuilder.Entity<Warehouse>(entity =>
+        {
+            entity.HasKey(e => e.WarehouseId);
+            entity.Property(e => e.WarehouseCode).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.WarehouseName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.WarehouseType).HasMaxLength(20);
+            entity.Property(e => e.ProvinceCode).HasMaxLength(20);
+            entity.Property(e => e.ProvinceName).HasMaxLength(100);
+            entity.Property(e => e.DistrictCode).HasMaxLength(20);
+            entity.Property(e => e.DistrictName).HasMaxLength(100);
+            entity.Property(e => e.WardCode).HasMaxLength(20);
+            entity.Property(e => e.WardName).HasMaxLength(100);
+            entity.Property(e => e.StreetAddress).HasMaxLength(500);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+        });
+
+        modelBuilder.Entity<Inventory>(entity =>
+        {
+            entity.HasKey(e => e.InventoryId);
+            entity.Property(e => e.BatchNumber).HasMaxLength(50);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Variant)
+                .WithMany(v => v.Inventories)
+                .HasForeignKey(e => e.VariantId)
+                .HasConstraintName("FK__Inventory__Variant");
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany(w => w.Inventories)
+                .HasForeignKey(e => e.WarehouseId)
+                .HasConstraintName("FK__Inventory__Warehouse");
+
+            entity.HasIndex(e => new { e.VariantId, e.WarehouseId }).IsUnique();
+        });
+
+        modelBuilder.Entity<StockMovement>(entity =>
+        {
+            entity.HasKey(e => e.MovementId);
+            entity.Property(e => e.MovementType).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.ReferenceType).HasMaxLength(30);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.StaffNote).HasMaxLength(1000);
+            entity.Property(e => e.PerformedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+
+            entity.HasOne(e => e.Variant)
+                .WithMany()
+                .HasForeignKey(e => e.VariantId)
+                .HasConstraintName("FK__StockMovement__Variant");
+
+            entity.HasOne(e => e.Warehouse)
+                .WithMany()
+                .HasForeignKey(e => e.WarehouseId)
+                .HasConstraintName("FK__StockMovement__Warehouse");
+
+            entity.HasOne(e => e.PerformedByUser)
+                .WithMany(u => u.StockMovements)
+                .HasForeignKey(e => e.PerformedBy)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Supplier>(entity =>
+        {
+            entity.HasKey(e => e.SupplierId);
+            entity.Property(e => e.SupplierCode).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.SupplierName).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -61,6 +61,9 @@ builder.Services.AddSwaggerGen(options =>
             Array.Empty<string>()
         }
     });
+
+    // Giải quyết xung đột Schema ID khi có các lớp trùng tên ở namespace khác nhau
+    options.CustomSchemaIds(type => type.FullName);
 });
 
 // Cấu hình JWT Authentication
