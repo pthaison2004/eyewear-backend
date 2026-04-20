@@ -11,5 +11,7 @@ public class OrderResponseDto
     public string OrderType { get; set; } = null!;
     public string? ShippingAddress { get; set; }
     public string? TrackingNumber { get; set; }
+    public decimal? PaidAmount { get; set; }
+    public DateTime? PreOrderDeadline { get; set; }
     public List<OrderItemDto> Items { get; set; } = new();
 }

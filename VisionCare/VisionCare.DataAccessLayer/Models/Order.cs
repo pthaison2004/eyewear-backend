@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace VisionCare.DataAccessLayer.Models;
@@ -22,6 +22,10 @@ public partial class Order
     public string? ShippingAddress { get; set; }
 
     public string? TrackingNumber { get; set; }
+
+    public decimal? PaidAmount { get; set; }
+
+    public DateTime? PreOrderDeadline { get; set; }
 
     public string? StaffNote { get; set; }
 

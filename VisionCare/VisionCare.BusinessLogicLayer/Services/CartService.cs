@@ -73,6 +73,54 @@ public class CartService : ICartService
         return await GetCartAsync(customerId);
     }
 
+    public async Task<CartResponseDto> AddComboAsync(int customerId, AddCartComboRequestDto request)
+    {
+        var cart = await GetOrCreateCartAsync(customerId);
+
+        // 1. Create Prescription
+        var prescription = new Prescription
+        {
+            CustomerId = customerId,
+            OdSphere = request.Prescription.ODSphere,
+            OdCylinder = request.Prescription.ODCylinder,
+            OdAxis = request.Prescription.ODAxis,
+            OsSphere = request.Prescription.OSSphere,
+            OsCylinder = request.Prescription.OSCylinder,
+            OsAxis = request.Prescription.OSAxis,
+            Pd = request.Prescription.PD,
+            Note = request.Prescription.Note,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.Prescriptions.Add(prescription);
+        await _context.SaveChangesAsync();
+
+        var prescriptionId = prescription.PrescriptionId;
+
+        // 2. Add Frame
+        var frameItem = new CartItem
+        {
+            CartId = cart.CartId,
+            VariantId = request.FrameVariantId,
+            PrescriptionId = prescriptionId,
+            Quantity = 1
+        };
+        _context.CartItems.Add(frameItem);
+
+        // 3. Add Lens
+        var lensItem = new CartItem
+        {
+            CartId = cart.CartId,
+            VariantId = request.LensVariantId,
+            PrescriptionId = prescriptionId,
+            Quantity = 1
+        };
+        _context.CartItems.Add(lensItem);
+
+        await _context.SaveChangesAsync();
+
+        return await GetCartAsync(customerId);
+    }
+
     public async Task<CartResponseDto> UpdateItemAsync(int cartItemId, int customerId, UpdateCartItemRequestDto request)
     {
         var cartItem = await _context.CartItems
@@ -173,6 +221,7 @@ public class CartService : ICartService
             Sku = ci.Variant?.Sku,
             Quantity = ci.Quantity,
             UnitPrice = (ci.Variant?.Product?.BasePrice ?? 0) + (ci.Variant?.AdditionalPrice ?? 0),
+            StockQuantity = ci.Variant?.StockQuantity ?? 0,
             PrescriptionId = ci.PrescriptionId
         }).ToList();
 
@@ -186,4 +235,4 @@ public class CartService : ICartService
             TotalAmount = totalAmount
         };
     }
-}
+}

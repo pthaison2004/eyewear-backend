@@ -65,6 +65,27 @@ public class CartController : ControllerBase
     }
 
     /// <summary>
+    /// Thêm Gọng + Tròng + Toa kính vào giỏ hàng
+    /// </summary>
+    [HttpPost("combo")]
+    public async Task<IActionResult> AddCombo([FromBody] AddCartComboRequestDto request)
+    {
+        try
+        {
+            var customerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(customerIdStr) || !int.TryParse(customerIdStr, out var customerId))
+                return BadRequest(new { message = "Không xác định được người dùng." });
+
+            var cart = await _cartService.AddComboAsync(customerId, request);
+            return Ok(cart);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Cập nhật số lượng sản phẩm trong giỏ hàng
     /// </summary>
     [HttpPut("items/{id}")]

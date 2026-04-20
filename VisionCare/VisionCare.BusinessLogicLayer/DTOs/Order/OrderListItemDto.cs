@@ -8,5 +8,8 @@ public class OrderListItemDto
     public string OrderStatus { get; set; } = null!;
     public string PaymentStatus { get; set; } = null!;
     public string OrderType { get; set; } = null!;
+    public decimal? PaidAmount { get; set; }
+    public DateTime? PreOrderDeadline { get; set; }
     public int ItemCount { get; set; }
+    public List<OrderItemDto> Items { get; set; } = new();
 }

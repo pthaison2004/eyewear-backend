@@ -131,4 +131,114 @@ public class ProductService : IProductService
             }).ToList()
         };
     }
+
+    public async Task<ProductResponseDto> CreateProductAsync(CreateProductRequestDto request)
+    {
+        var product = new Product
+        {
+            ProductName = request.ProductName,
+            CategoryId = request.CategoryId,
+            Brand = request.Brand,
+            Description = request.Description,
+            BasePrice = request.BasePrice,
+            IsPreOrder = request.IsPreOrder,
+            Image2D = request.Image2D,
+            Model3D = request.Model3D,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        if (request.Variants != null && request.Variants.Any())
+        {
+            foreach (var v in request.Variants)
+            {
+                product.ProductVariants.Add(new ProductVariant
+                {
+                    Color = v.Color,
+                    Size = v.Size,
+                    Sku = v.Sku,
+                    StockQuantity = v.StockQuantity,
+                    AdditionalPrice = v.AdditionalPrice
+                });
+            }
+        }
+
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+
+        return new ProductResponseDto
+        {
+            ProductId = product.ProductId,
+            ProductName = product.ProductName,
+            Brand = product.Brand,
+            Description = product.Description,
+            BasePrice = product.BasePrice,
+            IsPreOrder = product.IsPreOrder,
+            Image2D = product.Image2D,
+            Model3D = product.Model3D,
+            CreatedAt = product.CreatedAt,
+            TotalStock = product.ProductVariants.Sum(v => v.StockQuantity ?? 0),
+            MinPrice = product.ProductVariants.Any()
+                ? product.ProductVariants.Min(v => product.BasePrice + (v.AdditionalPrice ?? 0))
+                : product.BasePrice
+        };
+    }
+
+    public async Task<ProductResponseDto?> UpdateProductAsync(int id, UpdateProductRequestDto request)
+    {
+        var product = await _context.Products
+            .Include(p => p.ProductVariants)
+            .FirstOrDefaultAsync(p => p.ProductId == id);
+
+        if (product == null) return null;
+
+        if (request.ProductName != null) product.ProductName = request.ProductName;
+        if (request.CategoryId.HasValue) product.CategoryId = request.CategoryId.Value;
+        if (request.Brand != null) product.Brand = request.Brand;
+        if (request.Description != null) product.Description = request.Description;
+        if (request.BasePrice.HasValue) product.BasePrice = request.BasePrice.Value;
+        if (request.IsPreOrder.HasValue) product.IsPreOrder = request.IsPreOrder.Value;
+        if (request.Image2D != null) product.Image2D = request.Image2D;
+        if (request.Model3D != null) product.Model3D = request.Model3D;
+
+        await _context.SaveChangesAsync();
+
+        return new ProductResponseDto
+        {
+            ProductId = product.ProductId,
+            ProductName = product.ProductName,
+            Brand = product.Brand,
+            Description = product.Description,
+            BasePrice = product.BasePrice,
+            IsPreOrder = product.IsPreOrder,
+            Image2D = product.Image2D,
+            Model3D = product.Model3D,
+            CreatedAt = product.CreatedAt,
+            TotalStock = product.ProductVariants.Sum(v => v.StockQuantity ?? 0),
+            MinPrice = product.ProductVariants.Any()
+                ? product.ProductVariants.Min(v => product.BasePrice + (v.AdditionalPrice ?? 0))
+                : product.BasePrice
+        };
+    }
+
+    public async Task<bool> RestockAsync(RestockRequestDto request)
+    {
+        var variantIds = request.Items.Select(i => i.VariantId).ToList();
+        var variants = await _context.ProductVariants
+            .Where(v => variantIds.Contains(v.VariantId))
+            .ToListAsync();
+
+        if (!variants.Any()) return false;
+
+        foreach (var item in request.Items)
+        {
+            var variant = variants.FirstOrDefault(v => v.VariantId == item.VariantId);
+            if (variant != null)
+            {
+                variant.StockQuantity = item.Quantity;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
 }

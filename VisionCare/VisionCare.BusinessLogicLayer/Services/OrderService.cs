@@ -30,33 +30,49 @@ public class OrderService : IOrderService
             throw new InvalidOperationException("Cart is empty");
         }
 
+        bool hasPreOrderItems = false;
+        decimal paidAmount = 0;
+        decimal productTotal = 0;
+
         foreach (var item in cart.CartItems)
         {
             if (item.Variant == null)
             {
                 throw new InvalidOperationException("Cart contains an item with no variant.");
             }
+
+            var unitPrice = item.Variant.Product.BasePrice + (item.Variant.AdditionalPrice ?? 0);
+            var itemTotal = unitPrice * item.Quantity;
+            productTotal += itemTotal;
+
             if (item.Variant.StockQuantity < item.Quantity)
             {
-                throw new InvalidOperationException($"Not enough stock for {item.Variant.Product.ProductName}");
+                // Đây là sản phẩm nợ hàng (Pre-order)
+                hasPreOrderItems = true;
+                paidAmount += itemTotal * 0.3m; // Trả trước 30%
+            }
+            else
+            {
+                // Sản phẩm có sẵn
+                paidAmount += itemTotal; // Trả 100%
             }
         }
 
-        var totalAmount = cart.CartItems.Sum(item =>
-        {
-            var unitPrice = item.Variant.Product.BasePrice + (item.Variant.AdditionalPrice ?? 0);
-            return unitPrice * item.Quantity;
-        });
+        // Tính phí ship (ví dụ cố định 30.000 nếu đơn dưới 2 triệu)
+        decimal shippingFee = productTotal >= 2000000 ? 0 : 30000;
+        var totalAmount = productTotal + shippingFee;
 
         var order = new Order
         {
             CustomerId = customerId,
             OrderDate = DateTime.UtcNow,
             TotalAmount = totalAmount,
+            PaidAmount = paidAmount,
             OrderStatus = "Pending",
-            PaymentStatus = "Unpaid",
-            OrderType = request.OrderType,
-            ShippingAddress = request.ShippingAddress
+            PaymentStatus = "PartiallyPaid",
+            OrderType = hasPreOrderItems ? "PreOrder" : request.OrderType,
+            ShippingAddress = request.ShippingAddress,
+            PreOrderDeadline = hasPreOrderItems ? DateTime.UtcNow.AddDays(15) : null
         };
 
         _context.Orders.Add(order);
@@ -77,7 +93,11 @@ public class OrderService : IOrderService
 
             _context.OrderItems.Add(orderItem);
 
-            cartItem.Variant.StockQuantity -= cartItem.Quantity;
+            // Chỉ trừ kho nếu là hàng có sẵn
+            if (cartItem.Variant.StockQuantity >= cartItem.Quantity)
+            {
+                cartItem.Variant.StockQuantity -= cartItem.Quantity;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -100,6 +120,8 @@ public class OrderService : IOrderService
         var orders = await _context.Orders
             .Where(o => o.CustomerId == customerId)
             .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.Variant)
+                    .ThenInclude(v => v.Product)
             .OrderByDescending(o => o.OrderDate)
             .ToListAsync();
 
@@ -111,7 +133,22 @@ public class OrderService : IOrderService
             OrderStatus = o.OrderStatus ?? string.Empty,
             PaymentStatus = o.PaymentStatus ?? string.Empty,
             OrderType = o.OrderType ?? string.Empty,
-            ItemCount = o.OrderItems.Count
+            PaidAmount = o.PaidAmount,
+            PreOrderDeadline = o.PreOrderDeadline,
+            ItemCount = o.OrderItems.Count,
+            Items = o.OrderItems.Select(i => new OrderItemDto
+            {
+                OrderItemId = i.OrderItemId,
+                VariantId = i.VariantId,
+                ProductName = i.Variant?.Product?.ProductName ?? string.Empty,
+                VariantColor = i.Variant?.Color,
+                VariantSize = i.Variant?.Size,
+                Sku = i.Variant?.Sku,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                Subtotal = i.UnitPrice * i.Quantity,
+                PrescriptionId = i.PrescriptionId
+            }).ToList()
         }).ToList();
     }
 
@@ -175,6 +212,8 @@ public class OrderService : IOrderService
             OrderStatus = order.OrderStatus ?? string.Empty,
             PaymentStatus = order.PaymentStatus ?? string.Empty,
             OrderType = order.OrderType ?? string.Empty,
+            PaidAmount = order.PaidAmount,
+            PreOrderDeadline = order.PreOrderDeadline,
             ShippingAddress = order.ShippingAddress,
             TrackingNumber = order.TrackingNumber,
             Items = items.Select(i => new OrderItemDto

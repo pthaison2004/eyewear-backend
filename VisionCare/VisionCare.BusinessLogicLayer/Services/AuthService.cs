@@ -86,6 +86,7 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role?.RoleName,
+            PhoneNumber = user.PhoneNumber,
             AccessToken = accessToken,
             RefreshToken = refreshToken
         };
@@ -115,6 +116,7 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role?.RoleName,
+            PhoneNumber = user.PhoneNumber,
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken
         };

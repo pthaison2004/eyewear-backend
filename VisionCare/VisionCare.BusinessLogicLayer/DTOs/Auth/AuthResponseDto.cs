@@ -8,6 +8,7 @@ public class AuthResponseDto
     public string FullName { get; set; } = null!;
     public string Email { get; set; } = null!;
     public string? Role { get; set; }
+    public string? PhoneNumber { get; set; }
     public string AccessToken { get; set; } = null!;
     public string RefreshToken { get; set; } = null!;
 }
