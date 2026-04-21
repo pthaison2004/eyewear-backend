@@ -103,4 +103,52 @@ public class OrdersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Tạo checkout link thanh toán PayOS cho đơn hàng
+    /// </summary>
+    [HttpPost("{id}/create-payment-link")]
+    public async Task<IActionResult> CreatePaymentLink(int id)
+    {
+        try
+        {
+            var customerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(customerIdStr) || !int.TryParse(customerIdStr, out var customerId))
+                return BadRequest(new { message = "Không xác định được người dùng." });
+
+            var result = await _orderService.CreatePaymentLinkAsync(id, customerId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Callback API để Frontend tự gọi kiểm tra kết quả giao dịch
+    /// </summary>
+    [HttpGet("{id}/payment-status/{paymentLinkId}")]
+    public async Task<IActionResult> CheckPayment(int id, string paymentLinkId)
+    {
+        try
+        {
+            var customerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(customerIdStr) || !int.TryParse(customerIdStr, out var customerId))
+                return BadRequest(new { message = "Không xác định được người dùng." });
+
+            var isPaid = await _orderService.CheckPaymentStatusAsync(id, customerId, paymentLinkId);
+            
+            return Ok(new { 
+                OrderId = id, 
+                PaymentLinkId = paymentLinkId, 
+                IsPaid = isPaid, 
+                Status = isPaid ? "Paid" : "Unpaid"
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

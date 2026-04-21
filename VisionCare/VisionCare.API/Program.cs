@@ -7,9 +7,16 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using VisionCare.DataAccessLayer;
 using VisionCare.BusinessLogicLayer;
-
+using PayOS;
 
 var builder = WebApplication.CreateBuilder(args);
+
+PayOSClient payOS = new PayOSClient(
+    builder.Configuration["PayOS:ClientId"] ?? throw new Exception("Cannot find environment variable: PayOS:ClientId"),
+    builder.Configuration["PayOS:ApiKey"] ?? throw new Exception("Cannot find environment variable: PayOS:ApiKey"),
+    builder.Configuration["PayOS:ChecksumKey"] ?? throw new Exception("Cannot find environment variable: PayOS:ChecksumKey")
+);
+builder.Services.AddSingleton(payOS);
 
 // --- ĐĂNG KÝ SERVICES ---
 builder.Services.AddControllers();

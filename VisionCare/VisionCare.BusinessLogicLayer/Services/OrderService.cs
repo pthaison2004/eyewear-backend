@@ -5,16 +5,22 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VisionCare.BusinessLogicLayer.DTOs.Order;
 using VisionCare.DataAccessLayer.Models;
+using PayOS;
+using Microsoft.Extensions.Configuration;
 
 namespace VisionCare.BusinessLogicLayer.Services;
 
 public class OrderService : IOrderService
 {
     private readonly VisionCareContext _context;
+    private readonly PayOSClient _payOS;
+    private readonly IConfiguration _configuration;
 
-    public OrderService(VisionCareContext context)
+    public OrderService(VisionCareContext context, PayOSClient payOS, IConfiguration configuration)
     {
         _context = context;
+        _payOS = payOS;
+        _configuration = configuration;
     }
 
     public async Task<OrderResponseDto> CreateOrderAsync(int customerId, CreateOrderRequestDto request)
@@ -191,5 +197,108 @@ public class OrderService : IOrderService
                 PrescriptionId = i.PrescriptionId
             }).ToList()
         };
+    }
+
+    public async Task<PayOSLinkResponseDto> CreatePaymentLinkAsync(int orderId, int customerId)
+    {
+        var order = await _context.Orders
+            .Where(o => o.OrderId == orderId && o.CustomerId == customerId)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Variant)
+            .ThenInclude(v => v.Product)
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+        {
+            throw new InvalidOperationException("Order not found or does not belong to the user.");
+        }
+
+        if (order.PaymentStatus == "Paid")
+        {
+            throw new InvalidOperationException("Order is already paid.");
+        }
+
+        if (order.OrderStatus == "Cancelled")
+        {
+            throw new InvalidOperationException("Order is cancelled.");
+        }
+
+        var domain = _configuration["PayOS:ReturnUrl"] ?? "http://localhost:5173/payment/success";
+        var cancelDomain = _configuration["PayOS:CancelUrl"] ?? "http://localhost:5173/payment/cancel";
+
+        // orderCode must be less than 9007199254740991. Let's use a combination of orderId and timestamp
+        // to avoid duplicating orderCode for PayOS
+        long currentTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long orderCode = long.Parse($"{orderId}{currentTimestamp}");
+
+        decimal remainingAmount = order.TotalAmount;
+        if (order.OrderType == "Pre-order" && order.PaymentStatus == "PartialPaid")
+        {
+            var reservation = await _context.PreOrderReservations
+                .Include(r => r.Campaign)
+                .FirstOrDefaultAsync(r => r.ConvertedOrderId == order.OrderId);
+                
+            if (reservation != null && reservation.Campaign != null)
+            {
+                var depositRatio = reservation.Campaign.DepositRatio ?? 0m;
+                var depositAmount = order.TotalAmount * depositRatio;
+                remainingAmount = order.TotalAmount - depositAmount;
+            }
+        }
+
+        var totalAmount = Convert.ToInt64(Math.Round(remainingAmount));
+        
+        var items = new List<PayOS.Models.V2.PaymentRequests.PaymentLinkItem>
+        {
+            new PayOS.Models.V2.PaymentRequests.PaymentLinkItem
+            {
+                Name = "Gong Kinh",
+                Quantity = 1,
+                Price = Convert.ToInt32(Math.Round(remainingAmount))
+            }
+        };
+
+        var paymentData = new PayOS.Models.V2.PaymentRequests.CreatePaymentLinkRequest
+        {
+            OrderCode = orderCode,
+            Amount = totalAmount,
+            Description = $"Order {order.OrderId}".Substring(0, Math.Min($"Order {order.OrderId}".Length, 25)),
+            CancelUrl = $"{cancelDomain}?orderId={order.OrderId}",
+            ReturnUrl = $"{domain}?orderId={order.OrderId}"
+        };
+
+        var createPayment = await _payOS.PaymentRequests.CreateAsync(paymentData);
+
+        return new PayOSLinkResponseDto
+        {
+            CheckoutUrl = createPayment.CheckoutUrl,
+            PaymentLinkId = createPayment.PaymentLinkId
+        };
+    }
+
+    public async Task<bool> CheckPaymentStatusAsync(int orderId, int customerId, string paymentLinkId)
+    {
+        var order = await _context.Orders
+            .FirstOrDefaultAsync(o => o.OrderId == orderId && o.CustomerId == customerId);
+
+        if (order == null)
+        {
+            throw new InvalidOperationException("Order not found or does not belong to the user.");
+        }
+
+        if (order.PaymentStatus == "Paid")
+        {
+            return true;
+        }
+
+        var paymentInfo = await _payOS.PaymentRequests.GetAsync(paymentLinkId);
+        if (paymentInfo != null && paymentInfo.Status.ToString().Equals("PAID", StringComparison.OrdinalIgnoreCase))
+        {
+            order.PaymentStatus = "Paid";
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        return false;
     }
 }

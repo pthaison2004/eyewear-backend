@@ -145,7 +145,7 @@ public class ManagerPreOrderService : IManagerPreOrderService
                 CustomerId = reservation.CustomerId,
                 OrderType = "Pre-order",
                 OrderStatus = "Processing",
-                PaymentStatus = "Paid",
+                PaymentStatus = "PartialPaid",
                 TotalAmount = reservation.UnitPrice * reservation.ReservedQuantity,
                 OrderDate = DateTime.UtcNow,
                 StaffNote = request.Note ?? $"Converted from PreOrderReservation {reservation.ReservationCode}"
@@ -186,6 +186,27 @@ public class ManagerPreOrderService : IManagerPreOrderService
             CampaignId = campaignId,
             TotalConverted = convertedCount,
             Message = $"Successfully converted {convertedCount} reservations to orders."
+        };
+    }
+
+    public async Task<object> UpdateDepositConfigAsync(int campaignId, int managerId, UpdateDepositConfigDto request)
+    {
+        var campaign = await _context.PreOrderCampaigns
+            .FirstOrDefaultAsync(c => c.CampaignId == campaignId);
+
+        if (campaign == null)
+            throw new KeyNotFoundException($"Campaign {campaignId} not found");
+
+        campaign.DepositRatio = request.DepositRatio;
+        campaign.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new
+        {
+            CampaignId = campaign.CampaignId,
+            DepositRatio = campaign.DepositRatio,
+            Message = "Cập nhật tỉ lệ đặt cọc thành công."
         };
     }
 

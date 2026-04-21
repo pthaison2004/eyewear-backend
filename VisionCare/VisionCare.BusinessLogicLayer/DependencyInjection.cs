@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IOpsInventoryService, OpsInventoryService>();
         services.AddScoped<ISupplierService, SupplierService>();
         services.AddScoped<IManagerPreOrderService, ManagerPreOrderService>();
+        services.AddScoped<ICustomerPreOrderService, CustomerPreOrderService>();
 
         return services;
     }
