@@ -1,0 +1,1 @@
+USE VisionCare; INSERT INTO PreOrderReservations (ReservationCode, CampaignId, CustomerId, VariantId, ReservedQuantity, UnitPrice, Status, CreatedAt, ExpiresAt) VALUES ('RES-TEST111', 1, 5, 1, 2, 500000, 'paid', SYSUTCDATETIME(), SYSUTCDATETIME());

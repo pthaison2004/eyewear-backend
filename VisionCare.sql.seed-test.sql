@@ -119,6 +119,7 @@ PRINT '=======================================================';
 PRINT '';
 PRINT 'TÀI KHOẢN TEST (password: 123456):';
 PRINT '  - customer@visioncare.com (UserId=5, Role=Customer)';
+PRINT '  - manager@visioncare.com (Role=Manager)';
 PRINT '';
 PRINT 'SẢN PHẨM CÓ SẴN:';
 PRINT '  Product 1 (VRX1) - gọng tròn:';
