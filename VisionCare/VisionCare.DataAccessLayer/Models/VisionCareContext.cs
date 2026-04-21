@@ -56,6 +56,9 @@ public partial class VisionCareContext : DbContext
 
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
+    public virtual DbSet<GoodsReceipt> GoodsReceipts { get; set; }
+    public virtual DbSet<GoodsReceiptDetail> GoodsReceiptDetails { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -495,6 +498,50 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.SupplierCode).IsRequired().HasMaxLength(50);
             entity.Property(e => e.SupplierName).IsRequired().HasMaxLength(255);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+        });
+
+        modelBuilder.Entity<GoodsReceipt>(entity =>
+        {
+            entity.HasKey(e => e.GoodsReceiptId);
+            entity.Property(e => e.ReceiptNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("draft");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            
+            entity.HasOne(d => d.Campaign)
+                .WithMany()
+                .HasForeignKey(d => d.CampaignId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+                
+            entity.HasOne(d => d.ManagerUser)
+                .WithMany()
+                .HasForeignKey(d => d.ManagerId)
+                .OnDelete(DeleteBehavior.SetNull);
+                
+            entity.HasOne(d => d.Warehouse)
+                .WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GoodsReceiptDetail>(entity =>
+        {
+            entity.HasKey(e => e.DetailId);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
+            
+            entity.HasOne(d => d.GoodsReceipt)
+                .WithMany(p => p.Details)
+                .HasForeignKey(d => d.GoodsReceiptId)
+                .OnDelete(DeleteBehavior.Cascade);
+                
+            entity.HasOne(d => d.Variant)
+                .WithMany()
+                .HasForeignKey(d => d.VariantId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         OnModelCreatingPartial(modelBuilder);
