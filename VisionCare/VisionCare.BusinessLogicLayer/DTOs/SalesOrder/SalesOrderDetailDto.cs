@@ -29,6 +29,14 @@ public class SalesOrderItemDto
     public decimal Subtotal { get; set; }
 
     public int? PrescriptionId { get; set; }
+    public decimal? OdSphere { get; set; }
+    public decimal? OdCylinder { get; set; }
+    public int? OdAxis { get; set; }
+    public decimal? OsSphere { get; set; }
+    public decimal? OsCylinder { get; set; }
+    public int? OsAxis { get; set; }
+    public decimal? Pd { get; set; }
+
     public bool IsPrescriptionVerified { get; set; }
     public bool IsPrescriptionRejected { get; set; }
     public bool IsPrescriptionExpired { get; set; }

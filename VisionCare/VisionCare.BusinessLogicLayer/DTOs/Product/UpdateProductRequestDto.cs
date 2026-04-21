@@ -10,4 +10,6 @@ public class UpdateProductRequestDto
     public bool? IsPreOrder { get; set; }
     public string? Image2D { get; set; }
     public string? Model3D { get; set; }
+    public bool? IsFrame { get; set; }
+    public bool? IsLens { get; set; }
 }

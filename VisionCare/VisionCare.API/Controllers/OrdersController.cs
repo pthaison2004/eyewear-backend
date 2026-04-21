@@ -103,4 +103,25 @@ public class OrdersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Xác nhận nhận hàng (Mark order as Completed)
+    /// </summary>
+    [HttpPut("{id}/complete")]
+    public async Task<IActionResult> CompleteOrder(int id)
+    {
+        try
+        {
+            var customerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(customerIdStr) || !int.TryParse(customerIdStr, out var customerId))
+                return BadRequest(new { message = "Không xác định được người dùng." });
+
+            var order = await _orderService.CompleteOrderAsync(id, customerId);
+            return Ok(order);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

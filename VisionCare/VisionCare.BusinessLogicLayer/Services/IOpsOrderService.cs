@@ -9,6 +9,8 @@ public interface IOpsOrderService
     Task<OrderOpsDetailDto> PackOrderAsync(int orderId, int staffId);
     Task<OrderOpsDetailDto> UpdateOrderStatusAsync(int orderId, int staffId, UpdateOrderStatusRequestDto request);
 
+    Task<OrderOpsDetailDto> GetOrderByIdAsync(int orderId);
+
     Task<PaginatedResultDto<OpsOrderListItemDto>> GetOrdersAsync(OpsOrderListRequestDto request);
 
     Task<PaginatedResultDto<OpsOrderListItemDto>> GetReadyMadeOrdersAsync(OpsOrderListRequestDto request);

@@ -23,6 +23,29 @@ public class OpsOrderController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy chi tiết đơn hàng Ops
+    /// </summary>
+    [HttpGet("{id}")]
+    [Authorize(Roles = "Operations,Manager,Admin")]
+    public async Task<IActionResult> GetOrderById(int id)
+    {
+        try
+        {
+            var result = await _opsOrderService.GetOrderByIdAsync(id);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled error in {Method}", "GetOrderById");
+            return StatusCode(500, new { message = "Đã xảy ra lỗi khi xử lý yêu cầu. Vui lòng thử lại sau." });
+        }
+    }
+
+    /// <summary>
     /// Đánh dấu đơn hàng đã được đóng gói
     /// </summary>
     [HttpPut("{id}/pack")]

@@ -77,6 +77,13 @@ public class CartService : ICartService
     {
         var cart = await GetOrCreateCartAsync(customerId);
 
+        // Validate variants existence
+        var frameVariant = await _context.ProductVariants.AnyAsync(v => v.VariantId == request.FrameVariantId);
+        if (!frameVariant) throw new InvalidOperationException($"Không tìm thấy biến thể gọng kính (ID: {request.FrameVariantId}).");
+
+        var lensVariant = await _context.ProductVariants.AnyAsync(v => v.VariantId == request.LensVariantId);
+        if (!lensVariant) throw new InvalidOperationException($"Không tìm thấy biến thể tròng kính (ID: {request.LensVariantId}).");
+
         // 1. Create Prescription
         var prescription = new Prescription
         {
@@ -89,34 +96,44 @@ public class CartService : ICartService
             OsAxis = request.Prescription.OSAxis,
             Pd = request.Prescription.PD,
             Note = request.Prescription.Note,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            IsVerified = false,
+            IsRejected = false
         };
         _context.Prescriptions.Add(prescription);
+        
+        // Save prescription first to get Id
         await _context.SaveChangesAsync();
 
-        var prescriptionId = prescription.PrescriptionId;
-
         // 2. Add Frame
-        var frameItem = new CartItem
+        _context.CartItems.Add(new CartItem
         {
             CartId = cart.CartId,
             VariantId = request.FrameVariantId,
-            PrescriptionId = prescriptionId,
+            PrescriptionId = prescription.PrescriptionId,
             Quantity = 1
-        };
-        _context.CartItems.Add(frameItem);
+        });
 
         // 3. Add Lens
-        var lensItem = new CartItem
+        _context.CartItems.Add(new CartItem
         {
             CartId = cart.CartId,
             VariantId = request.LensVariantId,
-            PrescriptionId = prescriptionId,
+            PrescriptionId = prescription.PrescriptionId,
             Quantity = 1
-        };
-        _context.CartItems.Add(lensItem);
+        });
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("SAVE CHANGES ERROR: " + ex.Message);
+            if (ex.InnerException != null)
+                Console.WriteLine("INNER EXCEPTION: " + ex.InnerException.Message);
+            throw;
+        }
 
         return await GetCartAsync(customerId);
     }

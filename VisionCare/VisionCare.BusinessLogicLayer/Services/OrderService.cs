@@ -201,6 +201,43 @@ public class OrderService : IOrderService
         return MapToOrderResponseDto(order, order.OrderItems.ToList());
     }
 
+    public async Task<OrderResponseDto> CompleteOrderAsync(int orderId, int customerId)
+    {
+        var order = await _context.Orders
+            .Where(o => o.OrderId == orderId && o.CustomerId == customerId)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Variant)
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+        {
+            throw new InvalidOperationException("Order not found");
+        }
+
+        if (order.OrderStatus != "Delivered")
+        {
+            throw new InvalidOperationException("Only delivered orders can be completed by the customer");
+        }
+
+        var fromStatus = order.OrderStatus ?? string.Empty;
+        order.OrderStatus = "Completed";
+
+        var orderHistory = new OrderStatusHistory
+        {
+            OrderId = orderId,
+            FromStatus = fromStatus,
+            ToStatus = "Completed",
+            Note = "Customer confirmed receipt of goods",
+            ChangedBy = customerId,
+            ChangedAt = DateTime.UtcNow
+        };
+        _context.OrderStatusHistories.Add(orderHistory);
+
+        await _context.SaveChangesAsync();
+
+        return MapToOrderResponseDto(order, order.OrderItems.ToList());
+    }
+
     private static OrderResponseDto MapToOrderResponseDto(Order order, List<OrderItem> items)
     {
         return new OrderResponseDto

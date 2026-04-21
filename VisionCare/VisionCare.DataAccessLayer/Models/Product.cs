@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace VisionCare.DataAccessLayer.Models;
@@ -18,6 +18,9 @@ public partial class Product
     public decimal BasePrice { get; set; }
 
     public bool? IsPreOrder { get; set; }
+
+    public bool IsFrame { get; set; }
+    public bool IsLens { get; set; }
 
     public string? Image2D { get; set; }
 

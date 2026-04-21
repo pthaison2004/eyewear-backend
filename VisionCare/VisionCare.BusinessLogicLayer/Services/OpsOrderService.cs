@@ -11,7 +11,7 @@ public class OpsOrderService : IOpsOrderService
 {
     private static readonly HashSet<string> ValidStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Pending", "Confirmed", "Processing", "Packed", "Shipped", "Delivered", "Cancelled"
+        "Pending", "Confirmed", "Processing", "Packed", "Shipped", "Delivered", "Cancelled", "Completed"
     };
 
     private static readonly HashSet<string> PackableStatuses = new(StringComparer.OrdinalIgnoreCase)
@@ -21,7 +21,7 @@ public class OpsOrderService : IOpsOrderService
 
     private static readonly HashSet<string> TerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Cancelled", "Delivered"
+        "Cancelled", "Delivered", "Completed"
     };
 
     private static readonly HashSet<string> LensWorkAllowedStatuses = new(StringComparer.OrdinalIgnoreCase)
@@ -31,7 +31,7 @@ public class OpsOrderService : IOpsOrderService
 
     private static readonly HashSet<string> LensWorkTerminalStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Cancelled", "Delivered", "Packed", "Shipped"
+        "Cancelled", "Delivered", "Packed", "Shipped", "Completed"
     };
 
     private readonly VisionCareContext _context;
@@ -175,7 +175,25 @@ public class OpsOrderService : IOpsOrderService
         return string.Join(" / ", parts);
     }
 
+    public async Task<OrderOpsDetailDto> GetOrderByIdAsync(int orderId)
+    {
+        var order = await _context.Orders
+            .Include(o => o.Customer)
+            .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Variant)
+            .ThenInclude(v => v!.Product)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null)
+        {
+            throw new KeyNotFoundException($"Order with ID {orderId} not found.");
+        }
+
+        return MapToOrderOpsDetailDto(order);
+    }
+
     public async Task<PaginatedResultDto<OpsOrderListItemDto>> GetOrdersAsync(OpsOrderListRequestDto request)
+
     {
         return await BuildOrdersQueryAsync(request);
     }
@@ -258,6 +276,8 @@ public class OpsOrderService : IOpsOrderService
                 PaymentStatus = o.PaymentStatus ?? string.Empty,
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.OrderItems.Count,
+                HasPrescription = o.OrderItems.Any(i => i.PrescriptionId != null),
+                IsPreOrder = string.Equals(o.OrderType, "PreOrder", StringComparison.OrdinalIgnoreCase),
                 CreatedAt = o.OrderDate ?? DateTime.UtcNow
             })
             .ToListAsync();

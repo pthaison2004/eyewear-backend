@@ -11,5 +11,7 @@ public class SalesOrderListItemDto
     public string PaymentStatus { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
     public int ItemCount { get; set; }
+    public bool HasPrescription { get; set; }
+    public bool IsPrescriptionVerified { get; set; }
     public DateTime OrderDate { get; set; }
 }

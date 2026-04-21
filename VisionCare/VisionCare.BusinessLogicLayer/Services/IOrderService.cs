@@ -9,4 +9,5 @@ public interface IOrderService
     Task<List<OrderListItemDto>> GetOrdersAsync(int customerId);
     Task<OrderResponseDto> GetOrderByIdAsync(int orderId, int customerId);
     Task<OrderResponseDto> CancelOrderAsync(int orderId, int customerId);
+    Task<OrderResponseDto> CompleteOrderAsync(int orderId, int customerId);
 }

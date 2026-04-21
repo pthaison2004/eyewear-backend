@@ -13,7 +13,10 @@ public class ProductResponseDto
     public string? Image2D { get; set; }
     public string? Model3D { get; set; }
     public DateTime? CreatedAt { get; set; }
+    public bool IsFrame { get; set; }
+    public bool IsLens { get; set; }
     public CategoryDto? Category { get; set; }
+    public List<ProductVariantDto> ProductVariants { get; set; } = new();
 }
 
 public class CategoryDto

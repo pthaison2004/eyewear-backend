@@ -81,12 +81,24 @@ public class ProductService : IProductService
                 MinPrice = minPrice,
                 TotalStock = totalStock,
                 IsPreOrder = p.IsPreOrder,
+                IsFrame = p.IsFrame,
+                IsLens = p.IsLens,
                 Image2D = p.Image2D,
                 Model3D = p.Model3D,
                 CreatedAt = p.CreatedAt,
                 Category = p.Category != null
                     ? new CategoryDto { CategoryId = p.Category.CategoryId, CategoryName = p.Category.CategoryName }
-                    : null
+                    : null,
+                ProductVariants = p.ProductVariants.Select(v => new ProductVariantDto
+                {
+                    VariantId = v.VariantId,
+                    Color = v.Color,
+                    Size = v.Size,
+                    Sku = v.Sku,
+                    StockQuantity = v.StockQuantity,
+                    AdditionalPrice = v.AdditionalPrice ?? 0,
+                    EffectivePrice = p.BasePrice + (v.AdditionalPrice ?? 0)
+                }).ToList()
             };
         }).ToList();
 
@@ -113,6 +125,8 @@ public class ProductService : IProductService
             Description = p.Description,
             BasePrice = p.BasePrice,
             IsPreOrder = p.IsPreOrder,
+            IsFrame = p.IsFrame,
+            IsLens = p.IsLens,
             Image2D = p.Image2D,
             Model3D = p.Model3D,
             CreatedAt = p.CreatedAt,
@@ -142,6 +156,8 @@ public class ProductService : IProductService
             Description = request.Description,
             BasePrice = request.BasePrice,
             IsPreOrder = request.IsPreOrder,
+            IsFrame = request.IsFrame,
+            IsLens = request.IsLens,
             Image2D = request.Image2D,
             Model3D = request.Model3D,
             CreatedAt = DateTime.UtcNow
@@ -173,6 +189,8 @@ public class ProductService : IProductService
             Description = product.Description,
             BasePrice = product.BasePrice,
             IsPreOrder = product.IsPreOrder,
+            IsFrame = product.IsFrame,
+            IsLens = product.IsLens,
             Image2D = product.Image2D,
             Model3D = product.Model3D,
             CreatedAt = product.CreatedAt,
@@ -197,6 +215,8 @@ public class ProductService : IProductService
         if (request.Description != null) product.Description = request.Description;
         if (request.BasePrice.HasValue) product.BasePrice = request.BasePrice.Value;
         if (request.IsPreOrder.HasValue) product.IsPreOrder = request.IsPreOrder.Value;
+        if (request.IsFrame.HasValue) product.IsFrame = request.IsFrame.Value;
+        if (request.IsLens.HasValue) product.IsLens = request.IsLens.Value;
         if (request.Image2D != null) product.Image2D = request.Image2D;
         if (request.Model3D != null) product.Model3D = request.Model3D;
 
@@ -210,6 +230,8 @@ public class ProductService : IProductService
             Description = product.Description,
             BasePrice = product.BasePrice,
             IsPreOrder = product.IsPreOrder,
+            IsFrame = product.IsFrame,
+            IsLens = product.IsLens,
             Image2D = product.Image2D,
             Model3D = product.Model3D,
             CreatedAt = product.CreatedAt,

@@ -400,7 +400,8 @@ public class ShippingService : IShippingService
         var terminalStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Cancelled",
-            "Delivered"
+            "Delivered",
+            "Completed"
         };
 
         if (terminalStatuses.Contains(order.OrderStatus ?? string.Empty))

@@ -60,28 +60,10 @@ public class SalesOrderService : ISalesOrderService
             throw new KeyNotFoundException($"Không tìm thấy đơn hàng với ID {orderId}.");
         }
 
-        foreach (var item in order.OrderItems.Where(i => i.PrescriptionId != null))
-        {
-            if (item.Prescription == null ||
-                item.Prescription.IsVerified == false ||
-                item.Prescription.IsRejected == true)
-            {
-                throw new InvalidOperationException(
-                    "Đơn hàng có sản phẩm kê đơn chưa được xác minh. Vui lòng xác minh đơn kê đơn trước.");
-            }
-        }
-
         if (!string.Equals(order.OrderStatus, "Pending", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"Không thể xác nhận đơn hàng. Trạng thái hiện tại là '{order.OrderStatus}', chỉ đơn ở trạng thái 'Pending' mới được phép xác nhận.");
-        }
-
-        // Kiểm tra đã thanh toán chưa
-        if (!string.Equals(order.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Không thể xác nhận đơn hàng. Đơn hàng chưa được thanh toán (PaymentStatus: '{order.PaymentStatus}'). Vui lòng xác nhận thanh toán trước.");
         }
 
         order.OrderStatus = "Confirmed";
@@ -240,6 +222,7 @@ public class SalesOrderService : ISalesOrderService
         var query = _context.Orders
             .Include(o => o.Customer)
             .Include(o => o.OrderItems)
+            .ThenInclude(oi => oi.Prescription)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Status))
@@ -286,6 +269,8 @@ public class SalesOrderService : ISalesOrderService
                 PaymentStatus = o.PaymentStatus ?? string.Empty,
                 TotalAmount = o.TotalAmount,
                 ItemCount = o.OrderItems.Count,
+                HasPrescription = o.OrderItems.Any(i => i.PrescriptionId != null),
+                IsPrescriptionVerified = o.OrderItems.Where(i => i.PrescriptionId != null).All(i => i.Prescription != null && i.Prescription.IsVerified),
                 OrderDate = o.OrderDate ?? DateTime.UtcNow
             })
             .ToListAsync();
@@ -356,6 +341,13 @@ public class SalesOrderService : ISalesOrderService
                 UnitPrice = i.UnitPrice,
                 Subtotal = i.Quantity * i.UnitPrice,
                 PrescriptionId = i.PrescriptionId,
+                OdSphere = i.Prescription?.OdSphere,
+                OdCylinder = i.Prescription?.OdCylinder,
+                OdAxis = i.Prescription?.OdAxis,
+                OsSphere = i.Prescription?.OsSphere,
+                OsCylinder = i.Prescription?.OsCylinder,
+                OsAxis = i.Prescription?.OsAxis,
+                Pd = i.Prescription?.Pd,
                 IsPrescriptionVerified = i.Prescription?.IsVerified ?? false,
                 IsPrescriptionRejected = i.Prescription?.IsRejected ?? false,
                 IsPrescriptionExpired = i.Prescription?.CreatedAt.HasValue == true &&
