@@ -12,7 +12,7 @@ namespace VisionCare.API.Controllers;
 
 [Route("api/v1/manager/pre-orders")]
 [ApiController]
-[Authorize(Roles = "Manager,Admin")]
+[Authorize(Roles = "Manager,Admin,Operations")]
 public class ManagerPreOrderController : ControllerBase
 {
     private readonly IManagerPreOrderService _managerPreOrderService;
@@ -51,6 +51,7 @@ public class ManagerPreOrderController : ControllerBase
     /// Manager duyệt phiếu nhập hàng (Tiến hành nhập kho thực tế)
     /// </summary>
     [HttpPut("receipts/{id}/complete")]
+    [Authorize(Roles = "Manager,Admin")]
     public async Task<IActionResult> CompleteGoodsReceipt(int id, [FromBody] CompleteGoodsReceiptDto request)
     {
         try
@@ -78,6 +79,7 @@ public class ManagerPreOrderController : ControllerBase
     /// Manager tạo loạt đơn hàng cho các reservation thuộc chiến dịch
     /// </summary>
     [HttpPost("{campaignId}/convert-orders")]
+    [Authorize(Roles = "Manager,Admin")]
     public async Task<IActionResult> ConvertPreOrders(int campaignId, [FromBody] ConvertPreOrdersDto request)
     {
         try
@@ -101,6 +103,7 @@ public class ManagerPreOrderController : ControllerBase
     /// Manager điều chỉnh tỉ lệ đặt cọc (Deposit Ratio) cho một chiến dịch PreOrder
     /// </summary>
     [HttpPut("{campaignId}/deposit-config")]
+    [Authorize(Roles = "Manager,Admin")]
     public async Task<IActionResult> UpdateDepositConfig(int campaignId, [FromBody] UpdateDepositConfigDto request)
     {
         try
