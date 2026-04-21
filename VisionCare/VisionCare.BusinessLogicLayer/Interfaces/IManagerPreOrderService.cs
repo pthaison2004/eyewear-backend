@@ -8,4 +8,5 @@ public interface IManagerPreOrderService
     Task<GoodsReceiptDto> CreateGoodsReceiptAsync(int staffId, CreateGoodsReceiptDto request);
     Task<GoodsReceiptDto> CompleteGoodsReceiptAsync(int receiptId, int managerId, CompleteGoodsReceiptDto request);
     Task<ConvertPreOrderResultDto> ConvertReservationsToOrdersAsync(int campaignId, int managerId, ConvertPreOrdersDto request);
+    Task<object> UpdateDepositConfigAsync(int campaignId, int managerId, UpdateDepositConfigDto request);
 }

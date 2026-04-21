@@ -12,6 +12,7 @@ public partial class PreOrderReservation
     public int ReservedQuantity { get; set; }
     public decimal UnitPrice { get; set; }
     public string Status { get; set; } = "reserved";
+    public string? PaymentLinkId { get; set; }
     public int? ConvertedOrderId { get; set; }
     public DateTime ExpiresAt { get; set; }
     public DateTime? PaidAt { get; set; }

@@ -97,6 +97,29 @@ public class ManagerPreOrderController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Manager điều chỉnh tỉ lệ đặt cọc (Deposit Ratio) cho một chiến dịch PreOrder
+    /// </summary>
+    [HttpPut("{campaignId}/deposit-config")]
+    public async Task<IActionResult> UpdateDepositConfig(int campaignId, [FromBody] UpdateDepositConfigDto request)
+    {
+        try
+        {
+            var managerId = GetCurrentUserId();
+            var result = await _managerPreOrderService.UpdateDepositConfigAsync(campaignId, managerId, request);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error UpdateDepositConfig");
+            return StatusCode(500, new { message = "Lỗi khi cập nhật cấu hình đặt cọc." });
+        }
+    }
+
     private int GetCurrentUserId()
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
