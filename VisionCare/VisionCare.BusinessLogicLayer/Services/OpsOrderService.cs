@@ -147,12 +147,18 @@ public class OpsOrderService : IOpsOrderService
         };
         _context.OrderStatusHistories.Add(historyEntry);
 
+        if (string.Equals(newStatus, "Shipped", StringComparison.OrdinalIgnoreCase) || 
+            string.Equals(newStatus, "Dispatched", StringComparison.OrdinalIgnoreCase))
+        {
+            await DecreaseStockForOrderAsync(order.OrderId, staffId, $"Status manual update to {newStatus}");
+        }
+
         await _context.SaveChangesAsync();
 
         return MapToOrderOpsDetailDto(order);
     }
 
-    public async Task<OrderOpsDetailDto> GetOrderDetailAsync(int orderId)
+    public async Task<OrderOpsDetailDto> GetOrderDetailAsync(int id)
     {
         var order = await _context.Orders
             .Include(o => o.Customer)
@@ -161,14 +167,57 @@ public class OpsOrderService : IOpsOrderService
             .ThenInclude(v => v!.Product)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.Prescription)
-            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+            .FirstOrDefaultAsync(o => o.OrderId == id);
 
-        if (order == null)
+        if (order != null)
         {
-            throw new KeyNotFoundException($"Order with ID {orderId} not found.");
+            return MapToOrderOpsDetailDto(order);
         }
 
-        return MapToOrderOpsDetailDto(order);
+        // Try to find in PreOrderReservations if not found in Orders
+        var reservation = await _context.PreOrderReservations
+            .Include(r => r.Customer)
+            .Include(r => r.Variant)
+            .ThenInclude(v => v!.Product)
+            .Include(r => r.Campaign)
+            .FirstOrDefaultAsync(r => r.ReservationId == id);
+
+        if (reservation == null)
+        {
+            throw new KeyNotFoundException($"Order or Reservation with ID {id} not found.");
+        }
+
+        return MapReservationToOrderOpsDetailDto(reservation);
+    }
+
+    private static OrderOpsDetailDto MapReservationToOrderOpsDetailDto(PreOrderReservation r)
+    {
+        return new OrderOpsDetailDto
+        {
+            OrderId = r.ReservationId,
+            OrderCode = r.ReservationCode ?? $"RES-{r.ReservationId}",
+            CustomerName = r.Customer?.FullName ?? string.Empty,
+            CustomerEmail = r.Customer?.Email ?? string.Empty,
+            OrderType = "Pre-order",
+            OrderStatus = r.Status ?? string.Empty,
+            PaymentStatus = r.PaidAt != null ? "Paid" : "Pending",
+            TotalAmount = r.UnitPrice * r.ReservedQuantity,
+            ShippingAddress = r.ShippingAddress ?? string.Empty,
+            OrderDate = r.CreatedAt,
+            StaffNote = string.Empty,
+            Items = new List<OrderItemOpsDto>
+            {
+                new OrderItemOpsDto
+                {
+                    OrderItemId = r.ReservationId, // Mapping 1-1 for simplicity
+                    VariantId = r.VariantId,
+                    ProductName = r.Variant?.Product?.ProductName ?? "Unknown Product",
+                    VariantInfo = FormatVariantInfo(r.Variant),
+                    Quantity = r.ReservedQuantity,
+                    UnitPrice = r.UnitPrice
+                }
+            }
+        };
     }
 
     private static OrderOpsDetailDto MapToOrderOpsDetailDto(Order order)
@@ -838,7 +887,64 @@ public class OpsOrderService : IOpsOrderService
 
         await _context.SaveChangesAsync();
 
-        return shippingOrder;
+        return MapToOrderOpsDetailDto(order);
+    }
+
+    private async Task DecreaseStockForOrderAsync(int orderId, int staffId, string note)
+    {
+        var order = await _context.Orders
+            .Include(o => o.OrderItems)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null) return;
+
+        // Prevent double reduction
+        var alreadyReduced = await _context.StockMovements
+            .AnyAsync(m => m.ReferenceType == "order" && m.ReferenceId == orderId && m.MovementType == "SHIPMENT_OUT");
+        if (alreadyReduced) return;
+
+        var primaryWarehouse = await _context.Warehouses.FirstOrDefaultAsync(w => w.IsPrimary && w.IsActive)
+                               ?? await _context.Warehouses.FirstOrDefaultAsync(w => w.IsActive);
+        if (primaryWarehouse == null) return;
+
+        foreach (var item in order.OrderItems)
+        {
+            if (!item.VariantId.HasValue) continue;
+
+            // 1. Update ProductVariant total
+            var variant = await _context.ProductVariants.FindAsync(item.VariantId.Value);
+            if (variant != null)
+            {
+                variant.StockQuantity -= item.Quantity;
+            }
+
+            // 2. Update Inventory
+            var inventory = await _context.Inventories
+                .FirstOrDefaultAsync(i => i.VariantId == item.VariantId && i.WarehouseId == primaryWarehouse.WarehouseId);
+
+            if (inventory != null)
+            {
+                var qtyBefore = inventory.QuantityOnHand;
+                inventory.QuantityOnHand -= item.Quantity;
+                inventory.UpdatedAt = DateTime.UtcNow;
+
+                // 3. Record StockMovement
+                _context.StockMovements.Add(new StockMovement
+                {
+                    VariantId = item.VariantId.Value,
+                    WarehouseId = primaryWarehouse.WarehouseId,
+                    MovementType = "SHIPMENT_OUT",
+                    QuantityBefore = qtyBefore,
+                    QuantityChange = -item.Quantity,
+                    QuantityAfter = inventory.QuantityOnHand,
+                    ReferenceType = "order",
+                    ReferenceId = orderId,
+                    PerformedBy = staffId,
+                    PerformedAt = DateTime.UtcNow,
+                    StaffNote = note
+                });
+            }
+        }
     }
 
     public async Task<bool> MarkPreOrderStockArrivedAsync(int reservationId, int opsStaffId)

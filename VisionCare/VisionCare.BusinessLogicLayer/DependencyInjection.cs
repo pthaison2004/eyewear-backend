@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IManagerPreOrderService, ManagerPreOrderService>();
         services.AddScoped<ICustomerPreOrderService, CustomerPreOrderService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IOpsProcurementService, OpsProcurementService>();
 
         return services;
     }

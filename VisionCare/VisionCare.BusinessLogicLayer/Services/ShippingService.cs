@@ -181,9 +181,68 @@ public class ShippingService : IShippingService
         };
         _context.OrderStatusHistories.Add(historyEntry);
 
+        await DecreaseStockForOrderAsync(orderId, staffId, $"Shipment created: {shippingOrderCode}");
+
         await _context.SaveChangesAsync();
 
         return MapToDto(shippingOrder, order, shippingMethod);
+    }
+
+    private async Task DecreaseStockForOrderAsync(int orderId, int staffId, string note)
+    {
+        var order = await _context.Orders
+            .Include(o => o.OrderItems)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null) return;
+
+        // Prevent double reduction
+        var alreadyReduced = await _context.StockMovements
+            .AnyAsync(m => m.ReferenceType == "order" && m.ReferenceId == orderId && m.MovementType == "SHIPMENT_OUT");
+        if (alreadyReduced) return;
+
+        var primaryWarehouse = await _context.Warehouses.FirstOrDefaultAsync(w => w.IsPrimary && w.IsActive)
+                               ?? await _context.Warehouses.FirstOrDefaultAsync(w => w.IsActive);
+        if (primaryWarehouse == null) return;
+
+        foreach (var item in order.OrderItems)
+        {
+            if (!item.VariantId.HasValue) continue;
+
+            // 1. Update ProductVariant total
+            var variant = await _context.ProductVariants.FindAsync(item.VariantId.Value);
+            if (variant != null)
+            {
+                variant.StockQuantity -= item.Quantity;
+            }
+
+            // 2. Update Inventory
+            var inventory = await _context.Inventories
+                .FirstOrDefaultAsync(i => i.VariantId == item.VariantId && i.WarehouseId == primaryWarehouse.WarehouseId);
+
+            if (inventory != null)
+            {
+                var qtyBefore = inventory.QuantityOnHand;
+                inventory.QuantityOnHand -= item.Quantity;
+                inventory.UpdatedAt = DateTime.UtcNow;
+
+                // 3. Record StockMovement
+                _context.StockMovements.Add(new StockMovement
+                {
+                    VariantId = item.VariantId.Value,
+                    WarehouseId = primaryWarehouse.WarehouseId,
+                    MovementType = "SHIPMENT_OUT",
+                    QuantityBefore = qtyBefore,
+                    QuantityChange = -item.Quantity,
+                    QuantityAfter = inventory.QuantityOnHand,
+                    ReferenceType = "order",
+                    ReferenceId = orderId,
+                    PerformedBy = staffId,
+                    PerformedAt = DateTime.UtcNow,
+                    StaffNote = note
+                });
+            }
+        }
     }
 
     public async Task<ShippingOrderDto?> MarkOrderAsShippedAsync(int orderId, int staffId)

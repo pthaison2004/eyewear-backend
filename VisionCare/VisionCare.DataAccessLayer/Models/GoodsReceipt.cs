@@ -11,8 +11,10 @@ public partial class GoodsReceipt
     public int CreatedBy { get; set; }
     public int? ManagerId { get; set; }
     public int WarehouseId { get; set; }
-    public string Status { get; set; } = "draft"; // draft, completed, cancelled
+    public string Status { get; set; } = "PendingApproval"; // PendingApproval, Approved, AwaitingConfirmation, Completed, Cancelled
+    public string? ProofImage { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public string? Note { get; set; }
 

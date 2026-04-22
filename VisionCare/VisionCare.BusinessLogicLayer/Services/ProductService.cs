@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using VisionCare.BusinessLogicLayer.DTOs.Product;
+using VisionCare.BusinessLogicLayer.DTOs.ManagerProduct;
 using VisionCare.DataAccessLayer.Models;
 
 namespace VisionCare.BusinessLogicLayer.Services;
@@ -130,5 +131,79 @@ public class ProductService : IProductService
                 EffectivePrice = p.BasePrice + (v.AdditionalPrice ?? 0)
             }).ToList()
         };
+    }
+
+    public async Task<ProductDetailDto> CreateManagerProductAsync(CreateManagerProductDto dto)
+    {
+        var product = new Product
+        {
+            ProductName = dto.ProductName,
+            Brand = dto.Brand,
+            Description = dto.Description,
+            BasePrice = dto.BasePrice,
+            CategoryId = dto.CategoryId,
+            IsPreOrder = dto.IsPreOrder,
+            Image2D = dto.Image2D,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+
+        // Create default variant so it can be procured
+        var defaultVariant = new ProductVariant
+        {
+            ProductId = product.ProductId,
+            Color = "Mặc định",
+            Size = "Standard",
+            Sku = $"PRD-{product.ProductId}-DEF",
+            StockQuantity = 0,
+            AdditionalPrice = 0
+        };
+        _context.ProductVariants.Add(defaultVariant);
+        await _context.SaveChangesAsync();
+
+        return (await GetProductByIdAsync(product.ProductId))!;
+    }
+
+    public async Task<ProductDetailDto?> UpdateManagerProductAsync(int id, UpdateManagerProductDto dto)
+    {
+        var product = await _context.Products.FindAsync(id);
+        if (product == null) return null;
+
+        product.ProductName = dto.ProductName;
+        product.Brand = dto.Brand;
+        product.Description = dto.Description;
+        product.BasePrice = dto.BasePrice;
+        product.CategoryId = dto.CategoryId;
+        product.IsPreOrder = dto.IsPreOrder;
+        product.Image2D = dto.Image2D;
+
+        await _context.SaveChangesAsync();
+        return await GetProductByIdAsync(id);
+    }
+
+    public async Task<bool> DeleteManagerProductAsync(int id)
+    {
+        var product = await _context.Products
+            .Include(p => p.ProductVariants)
+            .FirstOrDefaultAsync(p => p.ProductId == id);
+
+        if (product == null) return false;
+
+        // Note: In a real system, we'd check if variants are used in Orders/Receipts before hard deleting.
+        // For simplicity, we remove variants then the product.
+        _context.ProductVariants.RemoveRange(product.ProductVariants);
+        _context.Products.Remove(product);
+
+        try
+        {
+            await _context.SaveChangesAsync();
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            throw new Exception("Không thể xóa sản phẩm này vì đã có dữ liệu liên kết (Đơn hàng/Nhập kho).");
+        }
     }
 }
