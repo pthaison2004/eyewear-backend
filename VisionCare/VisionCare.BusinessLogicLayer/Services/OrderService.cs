@@ -49,13 +49,13 @@ public class OrderService : IOrderService
             }
             if (item.Variant.StockQuantity < item.Quantity)
             {
-                throw new InvalidOperationException($"Not enough stock for {item.Variant.Product.ProductName}");
+                throw new InvalidOperationException($"Not enough stock for {item.Variant.Product?.ProductName ?? "Unknown Product"}");
             }
         }
 
         var totalAmount = cart.CartItems.Sum(item =>
         {
-            var unitPrice = item.Variant.Product.BasePrice + (item.Variant.AdditionalPrice ?? 0);
+            var unitPrice = (item.Variant?.Product?.BasePrice ?? 0) + (item.Variant?.AdditionalPrice ?? 0);
             return unitPrice * item.Quantity;
         });
 
@@ -79,7 +79,7 @@ public class OrderService : IOrderService
 
         foreach (var cartItem in cart.CartItems)
         {
-            var unitPrice = cartItem.Variant.Product.BasePrice + (cartItem.Variant.AdditionalPrice ?? 0);
+            var unitPrice = (cartItem.Variant?.Product?.BasePrice ?? 0) + (cartItem.Variant?.AdditionalPrice ?? 0);
 
             var orderItem = new OrderItem
             {
@@ -104,7 +104,7 @@ public class OrderService : IOrderService
         var orderItems = await _context.OrderItems
             .Where(oi => oi.OrderId == order.OrderId)
             .Include(oi => oi.Variant)
-            .ThenInclude(v => v.Product)
+            .ThenInclude(v => v!.Product)
             .ToListAsync();
 
         return MapToOrderResponseDto(order, orderItems);
@@ -262,7 +262,7 @@ public class OrderService : IOrderService
             .Where(o => o.OrderId == orderId && o.CustomerId == customerId)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.Variant)
-            .ThenInclude(v => v.Product)
+            .ThenInclude(v => v!.Product)
             .FirstOrDefaultAsync();
 
         if (order != null)
@@ -441,7 +441,7 @@ public class OrderService : IOrderService
             .Where(o => o.OrderId == orderId && o.CustomerId == customerId)
             .Include(o => o.OrderItems)
             .ThenInclude(oi => oi.Variant)
-            .ThenInclude(v => v.Product)
+            .ThenInclude(v => v!.Product)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -536,5 +536,27 @@ public class OrderService : IOrderService
         }
 
         return false;
+    }
+
+    public async Task<bool> SimulatePaymentSuccessAsync(int orderId, int customerId)
+    {
+        var order = await _context.Orders
+            .FirstOrDefaultAsync(o => o.OrderId == orderId && o.CustomerId == customerId);
+
+        if (order == null)
+        {
+            throw new KeyNotFoundException("Order not found or does not belong to the user.");
+        }
+
+        if (order.PaymentStatus == "Paid")
+        {
+            return true;
+        }
+
+        order.PaymentStatus = "Paid";
+        order.PaidAmount = order.TotalAmount;
+
+        await _context.SaveChangesAsync();
+        return true;
     }
 }

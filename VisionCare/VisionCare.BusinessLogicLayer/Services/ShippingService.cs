@@ -207,10 +207,12 @@ public class ShippingService : IShippingService
 
         foreach (var item in order.OrderItems)
         {
-            if (!item.VariantId.HasValue) continue;
+            // VariantId is an int, so it always has a value. 
+            // We assume valid VariantId (non-zero) or just proceed.
+            if (item.VariantId == 0) continue;
 
             // 1. Update ProductVariant total
-            var variant = await _context.ProductVariants.FindAsync(item.VariantId.Value);
+            var variant = await _context.ProductVariants.FindAsync(item.VariantId);
             if (variant != null)
             {
                 variant.StockQuantity -= item.Quantity;
@@ -229,7 +231,7 @@ public class ShippingService : IShippingService
                 // 3. Record StockMovement
                 _context.StockMovements.Add(new StockMovement
                 {
-                    VariantId = item.VariantId.Value,
+                    VariantId = item.VariantId,
                     WarehouseId = primaryWarehouse.WarehouseId,
                     MovementType = "SHIPMENT_OUT",
                     QuantityBefore = qtyBefore,
@@ -281,6 +283,7 @@ public class ShippingService : IShippingService
         }
 
         await _context.SaveChangesAsync();
+        await DecreaseStockForOrderAsync(orderId, staffId, $"Order shipped via {shippingOrder.ShippingMethod?.MethodName}");
 
         return MapToDto(shippingOrder, shippingOrder.Order, shippingOrder.ShippingMethod);
     }

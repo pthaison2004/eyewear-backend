@@ -886,8 +886,9 @@ public class OpsOrderService : IOpsOrderService
         _context.OrderStatusHistories.Add(historyEntry);
 
         await _context.SaveChangesAsync();
+        await DecreaseStockForOrderAsync(orderId, staffId, $"Pre-order campaign '{campaign.CampaignName}' fulfilled.");
 
-        return MapToOrderOpsDetailDto(order);
+        return shippingOrder;
     }
 
     private async Task DecreaseStockForOrderAsync(int orderId, int staffId, string note)
@@ -909,10 +910,11 @@ public class OpsOrderService : IOpsOrderService
 
         foreach (var item in order.OrderItems)
         {
-            if (!item.VariantId.HasValue) continue;
+            // VariantId is an int, so it always has a value.
+            if (item.VariantId == 0) continue;
 
             // 1. Update ProductVariant total
-            var variant = await _context.ProductVariants.FindAsync(item.VariantId.Value);
+            var variant = await _context.ProductVariants.FindAsync(item.VariantId);
             if (variant != null)
             {
                 variant.StockQuantity -= item.Quantity;
@@ -931,7 +933,7 @@ public class OpsOrderService : IOpsOrderService
                 // 3. Record StockMovement
                 _context.StockMovements.Add(new StockMovement
                 {
-                    VariantId = item.VariantId.Value,
+                    VariantId = item.VariantId,
                     WarehouseId = primaryWarehouse.WarehouseId,
                     MovementType = "SHIPMENT_OUT",
                     QuantityBefore = qtyBefore,

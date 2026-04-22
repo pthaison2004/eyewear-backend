@@ -12,4 +12,5 @@ public interface IOrderService
     Task<OrderResponseDto> CompleteOrderAsync(int orderId, int customerId);
     Task<PayOSLinkResponseDto> CreatePaymentLinkAsync(int orderId, int customerId);
     Task<bool> CheckPaymentStatusAsync(int orderId, int customerId, string paymentLinkId);
+    Task<bool> SimulatePaymentSuccessAsync(int orderId, int customerId);
 }
