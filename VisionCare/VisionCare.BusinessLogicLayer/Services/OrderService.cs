@@ -67,7 +67,8 @@ public class OrderService : IOrderService
         {
             CustomerId = customerId,
             OrderDate = DateTime.UtcNow,
-            TotalAmount = totalAmount,
+            TotalAmount = totalAmount + request.ShippingFee,
+            ShippingFee = request.ShippingFee,
             OrderStatus = "Pending",
             PaymentStatus = "Unpaid",
             OrderType = orderType,
@@ -413,6 +414,7 @@ public class OrderService : IOrderService
             CustomerId = order.CustomerId ?? 0,
             OrderDate = order.OrderDate ?? DateTime.MinValue,
             TotalAmount = order.TotalAmount,
+            ShippingFee = order.ShippingFee,
             PaidAmount = order.PaidAmount ?? 0,
             OrderStatus = order.OrderStatus ?? string.Empty,
             PaymentStatus = order.PaymentStatus ?? string.Empty,

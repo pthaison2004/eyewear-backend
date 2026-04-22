@@ -62,9 +62,14 @@ public class AuthService : IAuthService
             .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Email == request.Email);
 
-        if (user == null || user.IsActive == false)
+        if (user == null)
         {
             throw new Exception("Email hoặc mật khẩu không chính xác.");
+        }
+
+        if (user.IsActive == false)
+        {
+            throw new Exception("Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
         }
 
         bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
@@ -86,6 +91,7 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role?.RoleName,
+            RoleId = user.RoleId ?? 0,
             AccessToken = accessToken,
             RefreshToken = refreshToken
         };
@@ -115,6 +121,7 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role?.RoleName,
+            RoleId = user.RoleId ?? 0,
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken
         };

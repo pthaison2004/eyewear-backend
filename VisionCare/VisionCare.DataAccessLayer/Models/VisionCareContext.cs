@@ -60,6 +60,11 @@ public partial class VisionCareContext : DbContext
     public virtual DbSet<GoodsReceipt> GoodsReceipts { get; set; }
     public virtual DbSet<GoodsReceiptDetail> GoodsReceiptDetails { get; set; }
 
+    public virtual DbSet<SystemSetting> SystemSettings { get; set; }
+    public virtual DbSet<AuditLog> AuditLogs { get; set; }
+    public virtual DbSet<BlacklistedIp> BlacklistedIps { get; set; }
+    public virtual DbSet<CmsPage> CmsPages { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
     }
@@ -85,6 +90,7 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.PaymentStatus).HasMaxLength(50);
             entity.Property(e => e.PaidAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.TotalAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.ShippingFee).HasColumnType("decimal(18, 2)").HasDefaultValue(0m);
             entity.Property(e => e.TrackingNumber)
                 .HasMaxLength(100)
                 .IsUnicode(false);
@@ -559,6 +565,42 @@ public partial class VisionCareContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<SystemSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId);
+            entity.Property(e => e.SettingKey).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => e.SettingKey).IsUnique();
+            entity.Property(e => e.GroupName).HasMaxLength(50).HasDefaultValue("General");
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(e => e.AuditId);
+            entity.Property(e => e.Action).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.EntityName).HasMaxLength(100);
+            entity.Property(e => e.IpAddress).HasMaxLength(50);
+            
+            entity.HasOne(d => d.User)
+                .WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<BlacklistedIp>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.IpAddress).HasMaxLength(50).IsRequired();
+            entity.HasIndex(e => e.IpAddress).IsUnique();
+        });
+
+        modelBuilder.Entity<CmsPage>(entity =>
+        {
+            entity.HasKey(e => e.PageId);
+            entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
+            entity.HasIndex(e => e.Slug).IsUnique();
+            entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
         });
 
         OnModelCreatingPartial(modelBuilder);
