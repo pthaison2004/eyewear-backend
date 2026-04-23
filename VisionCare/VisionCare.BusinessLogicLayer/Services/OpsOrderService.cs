@@ -158,15 +158,32 @@ public class OpsOrderService : IOpsOrderService
         return MapToOrderOpsDetailDto(order);
     }
 
-    public async Task<OrderOpsDetailDto> GetOrderDetailAsync(int id)
+    public async Task<OrderOpsDetailDto> GetOrderDetailAsync(int id, bool isPreOrder = false)
     {
+        if (isPreOrder)
+        {
+            var res = await _context.PreOrderReservations
+                .Include(r => r.Customer)
+                .Include(r => r.Variant)
+                    .ThenInclude(v => v!.Product)
+                .Include(r => r.Campaign)
+                .FirstOrDefaultAsync(r => r.ReservationId == id);
+
+            if (res == null)
+            {
+                throw new KeyNotFoundException($"Pre-order Reservation with ID {id} not found.");
+            }
+
+            return MapReservationToOrderOpsDetailDto(res);
+        }
+
         var order = await _context.Orders
             .Include(o => o.Customer)
             .Include(o => o.OrderItems)
-            .ThenInclude(oi => oi.Variant)
-            .ThenInclude(v => v!.Product)
+                .ThenInclude(oi => oi.Variant)
+                    .ThenInclude(v => v!.Product)
             .Include(o => o.OrderItems)
-            .ThenInclude(oi => oi.Prescription)
+                .ThenInclude(oi => oi.Prescription)
             .FirstOrDefaultAsync(o => o.OrderId == id);
 
         if (order != null)
@@ -174,11 +191,11 @@ public class OpsOrderService : IOpsOrderService
             return MapToOrderOpsDetailDto(order);
         }
 
-        // Try to find in PreOrderReservations if not found in Orders
+        // Fallback for backward compatibility if flag not provided correctly
         var reservation = await _context.PreOrderReservations
             .Include(r => r.Customer)
             .Include(r => r.Variant)
-            .ThenInclude(v => v!.Product)
+                .ThenInclude(v => v!.Product)
             .Include(r => r.Campaign)
             .FirstOrDefaultAsync(r => r.ReservationId == id);
 
@@ -281,7 +298,7 @@ public class OpsOrderService : IOpsOrderService
     {
         // Auto-fix stranded released reservations that were not converted
         var strandedReservations = await _context.PreOrderReservations
-            .Where(r => r.Status.ToLower() == "released" && !r.ConvertedOrderId.HasValue)
+            .Where(r => r.Status != null && r.Status.ToLower() == "released" && !r.ConvertedOrderId.HasValue)
             .ToListAsync();
             
         if (strandedReservations.Any())
@@ -330,12 +347,12 @@ public class OpsOrderService : IOpsOrderService
             .Include(r => r.Variant)
                 .ThenInclude(v => v!.Product)
             .Include(r => r.Campaign)
-            .Where(r => activeStatuses.Contains(r.Status.ToLower()) && !r.ConvertedOrderId.HasValue)
+            .Where(r => r.Status != null && activeStatuses.Contains(r.Status.ToLower()) && !r.ConvertedOrderId.HasValue)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
-            query = query.Where(r => r.Status.ToLower() == request.Status.ToLower());
+            query = query.Where(r => r.Status != null && r.Status.ToLower() == request.Status.ToLower());
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))

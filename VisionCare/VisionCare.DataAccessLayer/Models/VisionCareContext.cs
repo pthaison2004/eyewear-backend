@@ -64,6 +64,7 @@ public partial class VisionCareContext : DbContext
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
     public virtual DbSet<BlacklistedIp> BlacklistedIps { get; set; }
     public virtual DbSet<CmsPage> CmsPages { get; set; }
+    public virtual DbSet<Brand> Brands { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -170,6 +171,10 @@ public partial class VisionCareContext : DbContext
             entity.HasOne(d => d.Category).WithMany(p => p.Products)
                 .HasForeignKey(d => d.CategoryId)
                 .HasConstraintName("FK__Products__Catego__2E1BDC42");
+
+            entity.HasOne(d => d.BrandNavigation).WithMany(p => p.Products)
+                .HasForeignKey(d => d.BrandId)
+                .HasConstraintName("FK__Products__Brand__BrandId");
         });
 
         modelBuilder.Entity<ProductVariant>(entity =>
@@ -601,6 +606,23 @@ public partial class VisionCareContext : DbContext
             entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
             entity.HasIndex(e => e.Slug).IsUnique();
             entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<Brand>(entity =>
+        {
+            entity.HasKey(e => e.BrandId);
+            entity.Property(e => e.BrandName).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Pending");
+            entity.Property(e => e.RequestType).HasMaxLength(50);
+            entity.Property(e => e.RequestDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Requester).WithMany()
+                .HasForeignKey(d => d.RequestedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(d => d.Approver).WithMany()
+                .HasForeignKey(d => d.ApprovedBy)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         OnModelCreatingPartial(modelBuilder);

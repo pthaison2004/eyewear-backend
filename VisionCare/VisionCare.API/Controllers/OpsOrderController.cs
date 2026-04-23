@@ -108,11 +108,11 @@ public class OpsOrderController : ControllerBase
     /// </summary>
     [HttpGet("{id:int}")]
     [Authorize(Roles = "Operations,Manager,Admin")]
-    public async Task<IActionResult> GetOrderDetail(int id)
+    public async Task<IActionResult> GetOrderDetail(int id, [FromQuery] bool isPreOrder = false)
     {
         try
         {
-            var result = await _opsOrderService.GetOrderDetailAsync(id);
+            var result = await _opsOrderService.GetOrderDetailAsync(id, isPreOrder);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)

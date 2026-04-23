@@ -26,4 +26,17 @@ public class SalesSummaryDto
     // Today's stats
     public int OrdersToday { get; set; }
     public decimal RevenueToday { get; set; }
+
+    // Revenue stats for dashboard
+    public decimal DailyRevenue { get; set; }
+    public decimal WeeklyRevenue { get; set; }
+    public decimal MonthlyRevenue { get; set; }
+    public decimal YearlyRevenue { get; set; }
+    public List<ChartDataDto> ChartData { get; set; } = new();
+}
+
+public class ChartDataDto
+{
+    public string Name { get; set; } = string.Empty;
+    public decimal Value { get; set; }
 }

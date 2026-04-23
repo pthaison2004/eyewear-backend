@@ -15,23 +15,88 @@ public class SalesReportService : ISalesReportService
 
     public async Task<SalesSummaryDto> GetSalesSummaryAsync(SalesSummaryRequestDto request)
     {
-        var query = BuildBaseQuery(request.DateFrom, request.DateTo);
-
         var today = DateTime.UtcNow.Date;
-        var todayQuery = _context.Orders.Where(o => o.OrderDate.HasValue && o.OrderDate.Value.Date == today);
+        
+        var query = _context.Orders.Where(o => o.OrderDate.HasValue && o.PaymentStatus == "Paid");
 
-        var results = await query.Select(o => new
+        if (request.DateFrom.HasValue)
         {
-            o.OrderStatus,
-            o.PaymentStatus,
-            o.OrderType,
-            o.TotalAmount
-        }).ToListAsync();
+            var startDate = request.DateFrom.Value.Date;
+            query = query.Where(o => o.OrderDate >= startDate);
+        }
+        if (request.DateTo.HasValue)
+        {
+            var endDate = request.DateTo.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(o => o.OrderDate <= endDate);
+        }
 
-        var todayResults = await todayQuery.Select(o => new
+        var allOrders = await query
+            .Select(o => new { o.OrderDate, o.TotalAmount, o.OrderStatus, o.OrderType, o.PaymentStatus })
+            .ToListAsync();
+
+        var dailyRevenue = allOrders.Where(o => o.OrderDate.Value.Date == today).Sum(o => o.TotalAmount);
+        var weeklyRevenue = allOrders.Where(o => o.OrderDate.Value.Date >= today.AddDays(-7)).Sum(o => o.TotalAmount);
+        var monthlyRevenue = allOrders.Where(o => o.OrderDate.Value.Month == today.Month && o.OrderDate.Value.Year == today.Year).Sum(o => o.TotalAmount);
+        var yearlyRevenue = allOrders.Where(o => o.OrderDate.Value.Year == today.Year).Sum(o => o.TotalAmount);
+
+        var chartData = new List<ChartDataDto>();
+        var period = request.Period?.ToLower() ?? "daily";
+
+        if (period == "daily")
         {
-            o.TotalAmount
-        }).ToListAsync();
+            // Last 14 days
+            for (int i = 13; i >= 0; i--)
+            {
+                var date = today.AddDays(-i);
+                chartData.Add(new ChartDataDto
+                {
+                    Name = date.ToString("dd/MM"),
+                    Value = allOrders.Where(o => o.OrderDate.Value.Date == date).Sum(o => o.TotalAmount) / 1000000m
+                });
+            }
+        }
+        else if (period == "weekly")
+        {
+            // Last 4 weeks
+            for (int i = 3; i >= 0; i--)
+            {
+                var start = today.AddDays(-((int)today.DayOfWeek + (i * 7)));
+                var end = start.AddDays(6).AddDays(1).AddTicks(-1);
+                chartData.Add(new ChartDataDto
+                {
+                    Name = $"Tuần {i + 1}",
+                    Value = allOrders.Where(o => o.OrderDate.Value.Date >= start && o.OrderDate.Value.Date <= end).Sum(o => o.TotalAmount) / 1000000m
+                });
+            }
+        }
+        else if (period == "monthly")
+        {
+            // Months of current year
+            for (int i = 1; i <= 12; i++)
+            {
+                chartData.Add(new ChartDataDto
+                {
+                    Name = $"Tháng {i}",
+                    Value = allOrders.Where(o => o.OrderDate.Value.Month == i && o.OrderDate.Value.Year == today.Year).Sum(o => o.TotalAmount) / 1000000m
+                });
+            }
+        }
+        else if (period == "custom" && request.DateFrom.HasValue && request.DateTo.HasValue)
+        {
+            // Daily for the range
+            var start = request.DateFrom.Value.Date;
+            var end = request.DateTo.Value.Date;
+            for (var d = start; d <= end; d = d.AddDays(1))
+            {
+                chartData.Add(new ChartDataDto
+                {
+                    Name = d.ToString("dd/MM"),
+                    Value = allOrders.Where(o => o.OrderDate.Value.Date == d).Sum(o => o.TotalAmount) / 1000000m
+                });
+            }
+        }
+
+        var results = allOrders;
 
         var summary = new SalesSummaryDto
         {
@@ -49,8 +114,13 @@ public class SalesReportService : ISalesReportService
             PaidCount = results.Count(r => string.Equals(r.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase)),
             UnpaidCount = results.Count(r => string.Equals(r.PaymentStatus, "Pending", StringComparison.OrdinalIgnoreCase) ||
                                             string.Equals(r.PaymentStatus, "Unpaid", StringComparison.OrdinalIgnoreCase)),
-            OrdersToday = todayResults.Count,
-            RevenueToday = todayResults.Sum(r => r.TotalAmount)
+            OrdersToday = dailyRevenue > 0 ? allOrders.Count(o => o.OrderDate.Value.Date == today) : 0,
+            RevenueToday = dailyRevenue,
+            DailyRevenue = dailyRevenue,
+            WeeklyRevenue = weeklyRevenue,
+            MonthlyRevenue = monthlyRevenue,
+            YearlyRevenue = yearlyRevenue,
+            ChartData = chartData
         };
 
         return summary;
@@ -128,10 +198,16 @@ public class SalesReportService : ISalesReportService
         var query = _context.Orders.AsQueryable();
 
         if (dateFrom.HasValue)
-            query = query.Where(o => o.OrderDate >= dateFrom.Value);
+        {
+            var startDate = dateFrom.Value.Date;
+            query = query.Where(o => o.OrderDate >= startDate);
+        }
 
         if (dateTo.HasValue)
-            query = query.Where(o => o.OrderDate <= dateTo.Value);
+        {
+            var endDate = dateTo.Value.Date.AddDays(1).AddTicks(-1);
+            query = query.Where(o => o.OrderDate <= endDate);
+        }
 
         return query;
     }

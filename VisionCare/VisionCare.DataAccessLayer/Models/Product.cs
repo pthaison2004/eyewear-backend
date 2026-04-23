@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace VisionCare.DataAccessLayer.Models;
@@ -8,6 +8,8 @@ public partial class Product
     public int ProductId { get; set; }
 
     public int? CategoryId { get; set; }
+
+    public int? BrandId { get; set; }
 
     public string ProductName { get; set; } = null!;
 
@@ -26,6 +28,8 @@ public partial class Product
     public DateTime? CreatedAt { get; set; }
 
     public virtual Category? Category { get; set; }
+
+    public virtual Brand? BrandNavigation { get; set; }
 
     public virtual ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 }

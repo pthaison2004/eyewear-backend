@@ -156,7 +156,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("stats")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager,Sales")]
     public async Task<IActionResult> GetDashboardStats()
     {
         var totalUsers = await _context.Users.CountAsync();
@@ -164,12 +164,47 @@ public class AdminController : ControllerBase
         var totalRevenue = await _context.Orders.Where(o => o.PaymentStatus == "Paid").SumAsync(o => o.TotalAmount);
         var activePromotions = await _context.Promotions.CountAsync(p => p.IsActive == true);
 
+        // Monthly Revenue (Last 6 months)
+        var today = DateTime.UtcNow;
+        var sixMonthsAgo = new DateTime(today.Year, today.Month, 1).AddMonths(-5);
+        
+        var monthlyRevenue = await _context.Orders
+            .Where(o => o.OrderDate >= sixMonthsAgo && o.PaymentStatus == "Paid")
+            .GroupBy(o => new { o.OrderDate.Value.Year, o.OrderDate.Value.Month })
+            .Select(g => new {
+                Name = $"Tháng {g.Key.Month}",
+                Revenue = g.Sum(o => o.TotalAmount),
+                Year = g.Key.Year,
+                Month = g.Key.Month
+            })
+            .OrderBy(g => g.Year).ThenBy(g => g.Month)
+            .ToListAsync();
+
+        // Order Type Stats
+        var orderTypeStats = await _context.Orders
+            .GroupBy(o => o.OrderType)
+            .Select(g => new {
+                Name = g.Key ?? "Khác",
+                Value = g.Count()
+            })
+            .ToListAsync();
+
+        // Map colors for pie chart
+        var colors = new[] { "#14b8a6", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6" };
+        var pieData = orderTypeStats.Select((s, i) => new {
+            s.Name,
+            s.Value,
+            Color = colors[i % colors.Length]
+        });
+
         return Ok(new {
             TotalUsers = totalUsers,
             TotalOrders = totalOrders,
             TotalRevenue = totalRevenue,
             ActivePromotions = activePromotions,
-            RecentGrowth = "+12.5%"
+            RecentGrowth = "+12.5%",
+            BarData = monthlyRevenue,
+            PieData = pieData
         });
     }
 
